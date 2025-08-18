@@ -44,6 +44,7 @@ class CanvasItem;
 class LiveEditor;
 class PopupMenu;
 class RuntimeNodeSelect;
+class RuntimeToolManager;
 class Script;
 class SceneTree;
 #ifndef _3D_DISABLED
@@ -228,9 +229,10 @@ public:
 	static LiveEditor *get_singleton();
 };
 
-class RuntimeNodeSelect : public Object {
-	GDCLASS(RuntimeNodeSelect, Object);
+class RuntimeTool : public Object {
+	GDCLASS(RuntimeTool, Object);
 
+	friend class RuntimeToolManager;
 public:
 	enum NodeType {
 		NODE_TYPE_NONE,
@@ -239,6 +241,32 @@ public:
 		NODE_TYPE_MAX,
 	};
 
+	enum ToolType {
+		TOOL_SELECT,
+		TOOL_RULER,
+		TOOL_MAX,
+	};
+
+private:
+	NodeType node_type = NODE_TYPE_2D;
+	ToolType tool_type = TOOL_MAX;
+
+protected:
+	RuntimeTool(ToolType p_type) : tool_type(p_type) { }
+
+	virtual void _process_frame() { }
+	virtual void _physics_frame() { }
+
+public:
+	virtual ToolType get_tool_type() const { return tool_type; }
+	virtual void set_node_type(NodeType p_node_type) { node_type = p_node_type; }
+	virtual NodeType get_node_type() const { return node_type; }
+};
+
+class RuntimeNodeSelect : public RuntimeTool {
+	GDCLASS(RuntimeNodeSelect, RuntimeTool);
+
+public:
 	enum SelectMode {
 		SELECT_MODE_SINGLE,
 		SELECT_MODE_LIST,
@@ -248,7 +276,6 @@ public:
 private:
 	friend class SceneDebugger;
 
-	NodeType node_select_type = NODE_TYPE_2D;
 	SelectMode node_select_mode = SELECT_MODE_SINGLE;
 
 	struct SelectResult {
@@ -372,7 +399,7 @@ private:
 
 	void _setup(const Dictionary &p_settings);
 
-	void _node_set_type(NodeType p_type);
+	void set_node_type(NodeType p_node_type) override;
 	void _select_set_mode(SelectMode p_mode);
 
 	void _set_camera_override_enabled(bool p_enabled);
@@ -381,8 +408,8 @@ private:
 	void _items_popup_index_pressed(int p_index, PopupMenu *p_popup);
 	void _update_input_state();
 
-	void _process_frame();
-	void _physics_frame();
+	void _process_frame() override;
+	void _physics_frame() override;
 
 	void _send_ids(const Vector<Node *> &p_picked_nodes, bool p_invert_new_selections = true);
 	void _set_selected_nodes(const Vector<Node *> &p_nodes);
@@ -419,13 +446,48 @@ private:
 	void _reset_camera_3d();
 #endif // _3D_DISABLED
 
-	RuntimeNodeSelect() { singleton = this; }
+	RuntimeNodeSelect() : RuntimeTool(TOOL_SELECT) { }
+	// RuntimeNodeSelect() : RuntimeTool(TOOL_SELECT) { singleton = this; }
 
-	inline static RuntimeNodeSelect *singleton = nullptr;
+	// inline static RuntimeNodeSelect *singleton = nullptr;
 
 public:
-	static RuntimeNodeSelect *get_singleton();
+	// static RuntimeNodeSelect *get_singleton();
 
 	~RuntimeNodeSelect();
 };
+
+class RuntimeToolManager : public Object {
+	GDCLASS(RuntimeToolManager, Object);
+
+	friend class SceneDebugger;
+private:
+	RuntimeToolManager() { singleton = this; }
+	inline static RuntimeToolManager *singleton = nullptr;
+
+public:
+	static RuntimeToolManager *get_singleton() { return singleton; }
+	~RuntimeToolManager();
+
+private:
+	RuntimeTool *active_tool = nullptr;
+	HashMap<RuntimeTool::ToolType, RuntimeTool *> tools;
+
+public:
+	void register_tool(RuntimeTool *p_tool);
+	void set_active_tool(RuntimeTool::ToolType p_tool);
+	RuntimeTool *get_active_tool() const { return active_tool; };
+
+	void process_frame();
+	void physics_frame();
+
+	template <class T>
+	T *get_tool(RuntimeTool::ToolType p_type) const {
+		if (tools.has(p_type)) {
+			return Object::cast_to<T>(tools.get(p_type));
+		}
+		return nullptr;
+	}
+};
+
 #endif // DEBUG_ENABLED

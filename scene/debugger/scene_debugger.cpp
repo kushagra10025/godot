@@ -63,12 +63,14 @@
 #include "scene/resources/surface_tool.h"
 #endif // _3D_DISABLED
 
+/// SceneDebugger
 SceneDebugger::SceneDebugger() {
 	singleton = this;
 
 #ifdef DEBUG_ENABLED
 	LiveEditor::singleton = memnew(LiveEditor);
-	RuntimeNodeSelect::singleton = memnew(RuntimeNodeSelect);
+	RuntimeToolManager::singleton = memnew(RuntimeToolManager);
+	RuntimeToolManager::get_singleton()->register_tool(memnew(RuntimeNodeSelect));
 
 	EngineDebugger::register_message_capture("scene", EngineDebugger::Capture(nullptr, SceneDebugger::parse_message));
 #endif // DEBUG_ENABLED
@@ -82,9 +84,9 @@ SceneDebugger::~SceneDebugger() {
 		LiveEditor::singleton = nullptr;
 	}
 
-	if (RuntimeNodeSelect::singleton) {
-		memdelete(RuntimeNodeSelect::singleton);
-		RuntimeNodeSelect::singleton = nullptr;
+	if (RuntimeToolManager::singleton) {
+		memdelete(RuntimeToolManager::singleton);
+		RuntimeToolManager::singleton = nullptr;
 	}
 #endif // DEBUG_ENABLED
 
@@ -168,7 +170,8 @@ Error SceneDebugger::_msg_inspect_objects(const Array &p_args) {
 }
 
 Error SceneDebugger::_msg_clear_selection(const Array &p_args) {
-	RuntimeNodeSelect::get_singleton()->_clear_selection();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_clear_selection();
+	// RuntimeNodeSelect::get_singleton()->_clear_selection();
 	return OK;
 }
 
@@ -176,7 +179,8 @@ Error SceneDebugger::_msg_suspend_changed(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	bool suspended = p_args[0];
 	SceneTree::get_singleton()->set_suspend(suspended);
-	RuntimeNodeSelect::get_singleton()->_update_input_state();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_update_input_state();
+	// RuntimeNodeSelect::get_singleton()->_update_input_state();
 	return OK;
 }
 
@@ -200,7 +204,8 @@ Error SceneDebugger::_msg_override_cameras(const Array &p_args) {
 #ifndef _3D_DISABLED
 	SceneTree::get_singleton()->get_root()->enable_camera_3d_override(enable);
 #endif // _3D_DISABLED
-	RuntimeNodeSelect::get_singleton()->_set_camera_override_enabled(enable && !from_editor);
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_set_camera_override_enabled(enable && !from_editor);
+	// RuntimeNodeSelect::get_singleton()->_set_camera_override_enabled(enable && !from_editor);
 	return OK;
 }
 
@@ -208,7 +213,8 @@ Error SceneDebugger::_msg_transform_camera_2d(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	Transform2D transform = p_args[0];
 	SceneTree::get_singleton()->get_root()->set_canvas_transform_override(transform);
-	RuntimeNodeSelect::get_singleton()->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	// RuntimeNodeSelect::get_singleton()->_queue_selection_update();
 	return OK;
 }
 
@@ -226,7 +232,8 @@ Error SceneDebugger::_msg_transform_camera_3d(const Array &p_args) {
 		SceneTree::get_singleton()->get_root()->set_camera_3d_override_orthogonal(size_or_fov, depth_near, depth_far);
 	}
 	SceneTree::get_singleton()->get_root()->set_camera_3d_override_transform(transform);
-	RuntimeNodeSelect::get_singleton()->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	// RuntimeNodeSelect::get_singleton()->_queue_selection_update();
 	return OK;
 }
 #endif // _3D_DISABLED
@@ -234,14 +241,16 @@ Error SceneDebugger::_msg_transform_camera_3d(const Array &p_args) {
 Error SceneDebugger::_msg_set_object_property(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.size() < 3, ERR_INVALID_DATA);
 	_set_object_property(p_args[0], p_args[1], p_args[2]);
-	RuntimeNodeSelect::get_singleton()->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	// RuntimeNodeSelect::get_singleton()->_queue_selection_update();
 	return OK;
 }
 
 Error SceneDebugger::_msg_set_object_property_field(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.size() < 4, ERR_INVALID_DATA);
 	_set_object_property(p_args[0], p_args[1], p_args[2], p_args[3]);
-	RuntimeNodeSelect::get_singleton()->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	// RuntimeNodeSelect::get_singleton()->_queue_selection_update();
 	return OK;
 }
 
@@ -352,14 +361,16 @@ Error SceneDebugger::_msg_live_instantiate_node(const Array &p_args) {
 Error SceneDebugger::_msg_live_remove_node(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	LiveEditor::get_singleton()->_remove_node_func(p_args[0]);
-	RuntimeNodeSelect::get_singleton()->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	// RuntimeNodeSelect::get_singleton()->_queue_selection_update();
 	return OK;
 }
 
 Error SceneDebugger::_msg_live_remove_and_keep_node(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.size() < 2, ERR_INVALID_DATA);
 	LiveEditor::get_singleton()->_remove_and_keep_node_func(p_args[0], p_args[1]);
-	RuntimeNodeSelect::get_singleton()->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	// RuntimeNodeSelect::get_singleton()->_queue_selection_update();
 	return OK;
 }
 
@@ -387,38 +398,45 @@ Error SceneDebugger::_msg_live_reparent_node(const Array &p_args) {
 
 Error SceneDebugger::_msg_runtime_node_select_setup(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty() || p_args[0].get_type() != Variant::DICTIONARY, ERR_INVALID_DATA);
-	RuntimeNodeSelect::get_singleton()->_setup(p_args[0]);
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_setup(p_args[0]);
+	// RuntimeNodeSelect::get_singleton()->_setup(p_args[0]);
 	return OK;
 }
 
 Error SceneDebugger::_msg_runtime_node_select_set_type(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	RuntimeNodeSelect::NodeType type = (RuntimeNodeSelect::NodeType)(int)p_args[0];
-	RuntimeNodeSelect::get_singleton()->_node_set_type(type);
+	// RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_node_set_type(type);
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->set_node_type(type);
+	// RuntimeNodeSelect::get_singleton()->_node_set_type(type);
 	return OK;
 }
 
 Error SceneDebugger::_msg_runtime_node_select_set_mode(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	RuntimeNodeSelect::SelectMode mode = (RuntimeNodeSelect::SelectMode)(int)p_args[0];
-	RuntimeNodeSelect::get_singleton()->_select_set_mode(mode);
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_select_set_mode(mode);
+	// RuntimeNodeSelect::get_singleton()->_select_set_mode(mode);
 	return OK;
 }
 
 Error SceneDebugger::_msg_runtime_node_select_set_visible(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	bool visible = p_args[0];
-	RuntimeNodeSelect::get_singleton()->_set_selection_visible(visible);
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_set_selection_visible(visible);
+	// RuntimeNodeSelect::get_singleton()->_set_selection_visible(visible);
 	return OK;
 }
 
 Error SceneDebugger::_msg_runtime_node_select_reset_camera_2d(const Array &p_args) {
-	RuntimeNodeSelect::get_singleton()->_reset_camera_2d();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_reset_camera_2d();
+	// RuntimeNodeSelect::get_singleton()->_reset_camera_2d();
 	return OK;
 }
 #ifndef _3D_DISABLED
 Error SceneDebugger::_msg_runtime_node_select_reset_camera_3d(const Array &p_args) {
-	RuntimeNodeSelect::get_singleton()->_reset_camera_3d();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_reset_camera_3d();
+	// RuntimeNodeSelect::get_singleton()->_reset_camera_3d();
 	return OK;
 }
 #endif // _3D_DISABLED
@@ -470,7 +488,7 @@ HashMap<String, SceneDebugger::ParseMessageFunc> SceneDebugger::message_handlers
 Error SceneDebugger::parse_message(void *p_user, const String &p_msg, const Array &p_args, bool &r_captured) {
 	ERR_FAIL_NULL_V(SceneTree::get_singleton(), ERR_UNCONFIGURED);
 	ERR_FAIL_NULL_V(LiveEditor::get_singleton(), ERR_UNCONFIGURED);
-	ERR_FAIL_NULL_V(RuntimeNodeSelect::get_singleton(), ERR_UNCONFIGURED);
+	ERR_FAIL_NULL_V(RuntimeToolManager::get_singleton(), ERR_UNCONFIGURED);
 
 	ParseMessageFunc *fn_ptr = message_handlers.getptr(p_msg);
 	if (fn_ptr) {
@@ -572,8 +590,10 @@ void SceneDebugger::_set_node_owner_recursive(Node *p_node, Node *p_owner) {
 
 void SceneDebugger::_send_object_ids(const Vector<ObjectID> &p_ids, bool p_update_selection) {
 	Vector<ObjectID> ids = p_ids;
-	if (ids.size() > RuntimeNodeSelect::get_singleton()->max_selection) {
-		ids.resize(RuntimeNodeSelect::get_singleton()->max_selection);
+
+	RuntimeNodeSelect *select_tool = RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT);
+	if (ids.size() > select_tool->max_selection) {
+		ids.resize(select_tool->max_selection);
 		EngineDebugger::get_singleton()->send_message("show_selection_limit_warning", Array());
 	}
 
@@ -599,7 +619,7 @@ void SceneDebugger::_send_object_ids(const Vector<ObjectID> &p_ids, bool p_updat
 	}
 
 	if (p_update_selection) {
-		RuntimeNodeSelect::get_singleton()->_set_selected_nodes(nodes);
+		select_tool->_set_selected_nodes(nodes);
 	}
 
 	if (objs_missing) {
@@ -1467,10 +1487,6 @@ void LiveEditor::_reparent_node_func(const NodePath &p_at, const NodePath &p_new
 }
 
 /// RuntimeNodeSelect
-RuntimeNodeSelect *RuntimeNodeSelect::get_singleton() {
-	return singleton;
-}
-
 RuntimeNodeSelect::~RuntimeNodeSelect() {
 	if (selection_list && !selection_list->is_visible()) {
 		memdelete(selection_list);
@@ -1586,8 +1602,8 @@ void RuntimeNodeSelect::_setup(const Dictionary &p_settings) {
 	root->connect(SceneStringName(tree_entered), callable_mp(this, &RuntimeNodeSelect::_update_input_state), Object::CONNECT_ONE_SHOT);
 }
 
-void RuntimeNodeSelect::_node_set_type(NodeType p_type) {
-	node_select_type = p_type;
+void RuntimeNodeSelect::set_node_type(NodeType p_node_type) {
+	RuntimeTool::set_node_type(p_node_type);
 	_update_input_state();
 }
 
@@ -1619,7 +1635,7 @@ void RuntimeNodeSelect::_set_camera_override_enabled(bool p_enabled) {
 
 void RuntimeNodeSelect::_root_window_input(const Ref<InputEvent> &p_event) {
 	Window *root = SceneTree::get_singleton()->get_root();
-	if (node_select_type == NODE_TYPE_NONE || (selection_list && selection_list->is_visible())) {
+	if (get_node_type() == NODE_TYPE_NONE || (selection_list && selection_list->is_visible())) {
 		// Workaround for platforms that don't allow subwindows.
 		if (selection_list && selection_list->is_visible() && selection_list->is_embedded()) {
 			root->set_disable_input_override(false);
@@ -1632,10 +1648,10 @@ void RuntimeNodeSelect::_root_window_input(const Ref<InputEvent> &p_event) {
 
 	bool is_dragging_camera = false;
 	if (camera_override) {
-		if (node_select_type == NODE_TYPE_2D) {
+		if (get_node_type() == NODE_TYPE_2D) {
 			is_dragging_camera = panner->gui_input(p_event, Rect2(Vector2(), root->get_visible_rect().get_size()));
 #ifndef _3D_DISABLED
-		} else if (node_select_type == NODE_TYPE_3D && selection_drag_state == SELECTION_DRAG_NONE) {
+		} else if (get_node_type() == NODE_TYPE_3D && selection_drag_state == SELECTION_DRAG_NONE) {
 			if (_handle_3d_input(p_event)) {
 				return;
 			}
@@ -1702,7 +1718,7 @@ void RuntimeNodeSelect::_update_input_state() {
 		return;
 	}
 
-	bool disable_input = scene_tree->is_suspended() || node_select_type != RuntimeNodeSelect::NODE_TYPE_NONE;
+	bool disable_input = scene_tree->is_suspended() || get_node_type() != RuntimeTool::NodeType::NODE_TYPE_NONE;
 	Input::get_singleton()->set_disable_input(disable_input);
 	Input::get_singleton()->set_mouse_mode_override_enabled(disable_input);
 	scene_tree->get_root()->set_disable_input_override(disable_input);
@@ -1784,7 +1800,7 @@ void RuntimeNodeSelect::_physics_frame() {
 	bool selection_drag_valid = selection_drag_state == SELECTION_DRAG_END && selection_drag_area.get_area() > SELECTION_MIN_AREA;
 	Vector<SelectResult> items;
 
-	if (node_select_type == NODE_TYPE_2D) {
+	if (get_node_type() == NODE_TYPE_2D) {
 		if (selection_drag_valid) {
 			for (int i = 0; i < root->get_child_count(); i++) {
 				_find_canvas_items_at_rect(selection_drag_area, root->get_child(i), items);
@@ -1808,7 +1824,7 @@ void RuntimeNodeSelect::_physics_frame() {
 			}
 		}
 #ifndef _3D_DISABLED
-	} else if (node_select_type == NODE_TYPE_3D) {
+	} else if (get_node_type() == NODE_TYPE_3D) {
 		if (selection_drag_valid) {
 			_find_3d_items_at_rect(selection_drag_area, items);
 		} else {
@@ -2987,5 +3003,40 @@ void RuntimeNodeSelect::_reset_camera_3d() {
 	SceneTree::get_singleton()->get_root()->set_camera_3d_override_perspective(camera_fov * cursor.fov_scale, camera_znear, camera_zfar);
 }
 #endif // _3D_DISABLED
+
+/// RuntimeToolManager
+RuntimeToolManager::~RuntimeToolManager() {
+	for (KeyValue<RuntimeTool::ToolType, RuntimeTool *> tool : tools) {
+		if (tool.value) {
+			memdelete(tool.value);
+		}
+	}
+	tools.clear();
+}
+
+void RuntimeToolManager::register_tool(RuntimeTool *p_tool)
+{
+	if (p_tool) {
+		tools[p_tool->get_tool_type()] = p_tool;
+	}
+}
+
+void RuntimeToolManager::set_active_tool(RuntimeTool::ToolType p_tool) {
+	if (tools.has(p_tool)) {
+		active_tool = tools[p_tool];
+	}
+}
+
+void RuntimeToolManager::process_frame() {
+	if (active_tool) {
+		active_tool->_process_frame();
+	}
+}
+
+void RuntimeToolManager::physics_frame() {
+	if (active_tool) {
+		active_tool->_physics_frame();
+	}
+}
 
 #endif // DEBUG_ENABLED

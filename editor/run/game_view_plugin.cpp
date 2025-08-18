@@ -535,8 +535,8 @@ void GameView::_suspend_button_toggled(bool p_pressed) {
 }
 
 void GameView::_node_type_pressed(int p_option) {
-	RuntimeNodeSelect::NodeType type = (RuntimeNodeSelect::NodeType)p_option;
-	for (int i = 0; i < RuntimeNodeSelect::NODE_TYPE_MAX; i++) {
+	RuntimeTool::NodeType type = (RuntimeTool::NodeType)p_option;
+	for (int i = 0; i < RuntimeTool::NODE_TYPE_MAX; i++) {
 		node_type_button[i]->set_pressed_no_signal(i == type);
 	}
 
@@ -779,9 +779,9 @@ void GameView::_notification(int p_what) {
 			suspend_button->set_button_icon(get_editor_theme_icon(SNAME("Pause")));
 			next_frame_button->set_button_icon(get_editor_theme_icon(SNAME("NextFrame")));
 
-			node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE]->set_button_icon(get_editor_theme_icon(SNAME("InputEventJoypadMotion")));
-			node_type_button[RuntimeNodeSelect::NODE_TYPE_2D]->set_button_icon(get_editor_theme_icon(SNAME("2DNodes")));
-			node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]->set_button_icon(get_editor_theme_icon(SNAME("Node3D")));
+			node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE]->set_button_icon(get_editor_theme_icon(SNAME("InputEventJoypadMotion")));
+			node_type_button[RuntimeTool::NodeType::NODE_TYPE_2D]->set_button_icon(get_editor_theme_icon(SNAME("2DNodes")));
+			node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]->set_button_icon(get_editor_theme_icon(SNAME("Node3D")));
 
 			select_mode_button[RuntimeNodeSelect::SELECT_MODE_SINGLE]->set_button_icon(get_editor_theme_icon(SNAME("ToolSelect")));
 			select_mode_button[RuntimeNodeSelect::SELECT_MODE_LIST]->set_button_icon(get_editor_theme_icon(SNAME("ListSelect")));
@@ -1033,10 +1033,10 @@ void GameView::_feature_profile_changed() {
 	is_feature_enabled = is_profile_null || !profile->is_feature_disabled(EditorFeatureProfile::FEATURE_GAME);
 
 	bool is_3d_enabled = is_profile_null || !profile->is_feature_disabled(EditorFeatureProfile::FEATURE_3D);
-	if (!is_3d_enabled && node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]->is_pressed()) {
-		_node_type_pressed(RuntimeNodeSelect::NODE_TYPE_NONE);
+	if (!is_3d_enabled && node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]->is_pressed()) {
+		_node_type_pressed(RuntimeTool::NodeType::NODE_TYPE_NONE);
 	}
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]->set_visible(is_3d_enabled);
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]->set_visible(is_3d_enabled);
 }
 
 GameView::GameView(Ref<GameViewDebugger> p_debugger, EmbeddedProcessBase *p_embedded_process, WindowWrapper *p_wrapper) {
@@ -1074,30 +1074,30 @@ GameView::GameView(Ref<GameViewDebugger> p_debugger, EmbeddedProcessBase *p_embe
 
 	main_menu_hbox->add_child(memnew(VSeparator));
 
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE] = memnew(Button);
-	main_menu_hbox->add_child(node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE]);
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE]->set_text(TTRC("Input"));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE]->set_toggle_mode(true);
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE]->set_pressed(true);
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE]->set_theme_type_variation(SceneStringName(FlatButton));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE]->connect(SceneStringName(pressed), callable_mp(this, &GameView::_node_type_pressed).bind(RuntimeNodeSelect::NODE_TYPE_NONE));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_NONE]->set_tooltip_text(TTRC("Allow game input."));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE] = memnew(Button);
+	main_menu_hbox->add_child(node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE]);
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE]->set_text(TTRC("Input"));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE]->set_toggle_mode(true);
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE]->set_pressed(true);
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE]->set_theme_type_variation(SceneStringName(FlatButton));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE]->connect(SceneStringName(pressed), callable_mp(this, &GameView::_node_type_pressed).bind(RuntimeTool::NodeType::NODE_TYPE_NONE));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_NONE]->set_tooltip_text(TTRC("Allow game input."));
 
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_2D] = memnew(Button);
-	main_menu_hbox->add_child(node_type_button[RuntimeNodeSelect::NODE_TYPE_2D]);
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_2D]->set_text(TTRC("2D"));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_2D]->set_toggle_mode(true);
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_2D]->set_theme_type_variation(SceneStringName(FlatButton));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_2D]->connect(SceneStringName(pressed), callable_mp(this, &GameView::_node_type_pressed).bind(RuntimeNodeSelect::NODE_TYPE_2D));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_2D]->set_tooltip_text(TTRC("Disable game input and allow to select Node2Ds, Controls, and manipulate the 2D camera."));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_2D] = memnew(Button);
+	main_menu_hbox->add_child(node_type_button[RuntimeTool::NodeType::NODE_TYPE_2D]);
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_2D]->set_text(TTRC("2D"));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_2D]->set_toggle_mode(true);
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_2D]->set_theme_type_variation(SceneStringName(FlatButton));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_2D]->connect(SceneStringName(pressed), callable_mp(this, &GameView::_node_type_pressed).bind(RuntimeTool::NodeType::NODE_TYPE_2D));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_2D]->set_tooltip_text(TTRC("Disable game input and allow to select Node2Ds, Controls, and manipulate the 2D camera."));
 
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_3D] = memnew(Button);
-	main_menu_hbox->add_child(node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]);
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]->set_text(TTRC("3D"));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]->set_toggle_mode(true);
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]->set_theme_type_variation(SceneStringName(FlatButton));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]->connect(SceneStringName(pressed), callable_mp(this, &GameView::_node_type_pressed).bind(RuntimeNodeSelect::NODE_TYPE_3D));
-	node_type_button[RuntimeNodeSelect::NODE_TYPE_3D]->set_tooltip_text(TTRC("Disable game input and allow to select Node3Ds and manipulate the 3D camera."));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D] = memnew(Button);
+	main_menu_hbox->add_child(node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]);
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]->set_text(TTRC("3D"));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]->set_toggle_mode(true);
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]->set_theme_type_variation(SceneStringName(FlatButton));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]->connect(SceneStringName(pressed), callable_mp(this, &GameView::_node_type_pressed).bind(RuntimeTool::NodeType::NODE_TYPE_3D));
+	node_type_button[RuntimeTool::NodeType::NODE_TYPE_3D]->set_tooltip_text(TTRC("Disable game input and allow to select Node3Ds and manipulate the 3D camera."));
 
 	main_menu_hbox->add_child(memnew(VSeparator));
 

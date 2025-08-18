@@ -49,9 +49,9 @@ private:
 	Vector<Ref<EditorDebuggerSession>> sessions;
 
 	bool is_feature_enabled = true;
-	int node_type = RuntimeNodeSelect::NODE_TYPE_NONE;
+	int node_type = RuntimeTool::NodeType::NODE_TYPE_NONE;
 	bool selection_visible = true;
-	int select_mode = RuntimeNodeSelect::SELECT_MODE_SINGLE;
+	int select_mode = RuntimeNodeSelect::SelectMode::SELECT_MODE_SINGLE;
 	bool mute_audio = false;
 	EditorDebuggerNode::CameraOverride camera_override_mode = EditorDebuggerNode::OVERRIDE_INGAME;
 
@@ -152,7 +152,7 @@ class GameView : public VBoxContainer {
 	Button *suspend_button = nullptr;
 	Button *next_frame_button = nullptr;
 
-	Button *node_type_button[RuntimeNodeSelect::NODE_TYPE_MAX];
+	Button *node_type_button[RuntimeTool::NodeType::NODE_TYPE_MAX];
 	Button *select_mode_button[RuntimeNodeSelect::SELECT_MODE_MAX];
 
 	Button *hide_selection = nullptr;
