@@ -229,6 +229,104 @@ public:
 	static LiveEditor *get_singleton();
 };
 
+class RuntimeViewContext {
+
+private:
+	bool camera_override = false;
+#ifndef _3D_DISABLED
+	bool camera_first_override = true;
+	bool camera_freelook = false;
+#endif // _3D_DISABLED
+
+public:
+	virtual ~RuntimeViewContext() = default;
+	// Values taken from EditorZoomWidget.
+	const float VIEW_2D_MIN_ZOOM = 1.0 / 128;
+	const float VIEW_2D_MAX_ZOOM = 128;
+
+	Ref<ViewPanner> panner;
+
+	Vector2 view_2d_offset;
+	real_t view_2d_zoom = 1.0;
+	bool warped_panning = false;
+
+#ifndef _3D_DISABLED
+	// Values taken from Node3DEditor.
+	const float VIEW_3D_MIN_ZOOM = 0.01;
+#ifdef REAL_T_IS_DOUBLE
+	const double VIEW_3D_MAX_ZOOM = 1'000'000'000'000;
+#else
+	const float VIEW_3D_MAX_ZOOM = 10'000;
+#endif // REAL_T_IS_DOUBLE
+
+	const float CAMERA_MIN_FOV_SCALE = 0.1;
+	const float CAMERA_MAX_FOV_SCALE = 2.5;
+
+	struct Cursor {
+		Vector3 pos;
+		real_t x_rot, y_rot, distance, fov_scale;
+		Vector3 eye_pos; // Used in freelook mode.
+
+		Cursor() {
+			// These rotations place the camera in +X +Y +Z, aka south east, facing north west.
+			x_rot = 0.5;
+			y_rot = -0.5;
+			distance = 4;
+			fov_scale = 1.0;
+		}
+
+		Transform3D get_transform() {
+			Transform3D camera_transform;
+			camera_transform.translate_local(pos);
+			camera_transform.basis.rotate(Vector3(1, 0, 0), -x_rot);
+			camera_transform.basis.rotate(Vector3(0, 1, 0), -y_rot);
+			camera_transform.translate_local(0, 0, distance);
+			return camera_transform;
+		}
+	};
+	Cursor cursor;
+
+	real_t camera_fov = 0;
+	real_t camera_znear = 0;
+	real_t camera_zfar = 0;
+
+	bool invert_x_axis = false;
+	bool invert_y_axis = false;
+	bool warped_mouse_panning_3d = false;
+
+	real_t freelook_base_speed = 0;
+	real_t freelook_sensitivity = 0;
+	real_t orbit_sensitivity = 0;
+	real_t translation_sensitivity = 0;
+
+	Vector2 previous_mouse_position;
+#endif // _3D_DISABLED
+
+	bool get_camera_override() const { return camera_override; };
+
+	void set_camera_override_enabled(bool p_enabled);
+
+	virtual void reset_camera_2d();
+	virtual void update_view_2d();
+
+#ifndef _3D_DISABLED
+	virtual void reset_camera_3d();
+
+	void cursor_scale_distance(real_t p_scale);
+	void cursor_look(Ref<InputEventWithModifiers> p_event);
+	void cursor_pan(Ref<InputEventWithModifiers> p_event);
+	void cursor_orbit(Ref<InputEventWithModifiers> p_event);
+	void scale_freelook_speed(real_t p_scale);
+	Point2 get_warped_mouse_motion(const Ref<InputEventMouseMotion> &p_event, Rect2 p_area) const;
+
+	Vector3 get_screen_to_space(const Vector3 &p_vector3);
+	bool handle_3d_input(const Ref<InputEvent> &p_event);
+	void set_camera_freelook_enabled(bool p_enabled);
+
+	bool get_camera_freelook() const { return camera_freelook; };
+#endif // _3D_DISABLED
+};
+
 class RuntimeTool : public Object {
 	GDCLASS(RuntimeTool, Object);
 
@@ -250,14 +348,20 @@ public:
 private:
 	NodeType node_type = NODE_TYPE_2D;
 	ToolType tool_type = TOOL_MAX;
-
+	bool active = false;
 protected:
 	RuntimeTool(ToolType p_type) : tool_type(p_type) { }
 
+	virtual void _setup(const Dictionary &p_settings);
+	virtual void _window_input_event(const Ref<InputEvent> &p_event) { }
 	virtual void _process_frame() { }
 	virtual void _physics_frame() { }
 
 public:
+	virtual void activate() { active = true; }
+	virtual void deactivate() { active = false; }
+	bool is_activated() const { return active; }
+
 	virtual ToolType get_tool_type() const { return tool_type; }
 	virtual void set_node_type(NodeType p_node_type) { node_type = p_node_type; }
 	virtual NodeType get_node_type() const { return node_type; }
@@ -307,67 +411,14 @@ private:
 	RID draw_canvas;
 	RID sel_drag_ci;
 
-	bool camera_override = false;
-
-	// Values taken from EditorZoomWidget.
-	const float VIEW_2D_MIN_ZOOM = 1.0 / 128;
-	const float VIEW_2D_MAX_ZOOM = 128;
-
-	Ref<ViewPanner> panner;
-	Vector2 view_2d_offset;
-	real_t view_2d_zoom = 1.0;
-	bool warped_panning = false;
-
 	LocalVector<ObjectID> selected_ci_nodes;
 	real_t sel_2d_grab_dist = 0;
 
 	RID sbox_2d_ci;
 
+	RuntimeViewContext *view_context;
+
 #ifndef _3D_DISABLED
-	struct Cursor {
-		Vector3 pos;
-		real_t x_rot, y_rot, distance, fov_scale;
-		Vector3 eye_pos; // Used in freelook mode.
-
-		Cursor() {
-			// These rotations place the camera in +X +Y +Z, aka south east, facing north west.
-			x_rot = 0.5;
-			y_rot = -0.5;
-			distance = 4;
-			fov_scale = 1.0;
-		}
-	};
-	Cursor cursor;
-
-	// Values taken from Node3DEditor.
-	const float VIEW_3D_MIN_ZOOM = 0.01;
-#ifdef REAL_T_IS_DOUBLE
-	const double VIEW_3D_MAX_ZOOM = 1'000'000'000'000;
-#else
-	const float VIEW_3D_MAX_ZOOM = 10'000;
-#endif // REAL_T_IS_DOUBLE
-
-	const float CAMERA_MIN_FOV_SCALE = 0.1;
-	const float CAMERA_MAX_FOV_SCALE = 2.5;
-
-	bool camera_first_override = true;
-	bool camera_freelook = false;
-
-	real_t camera_fov = 0;
-	real_t camera_znear = 0;
-	real_t camera_zfar = 0;
-
-	bool invert_x_axis = false;
-	bool invert_y_axis = false;
-	bool warped_mouse_panning_3d = false;
-
-	real_t freelook_base_speed = 0;
-	real_t freelook_sensitivity = 0;
-	real_t orbit_sensitivity = 0;
-	real_t translation_sensitivity = 0;
-
-	Vector2 previous_mouse_position;
-
 	struct SelectionBox3D : public RefCounted {
 		RID instance;
 		RID instance_ofs;
@@ -397,14 +448,12 @@ private:
 	RID sbox_3d_xray_ofs;
 #endif // _3D_DISABLED
 
-	void _setup(const Dictionary &p_settings);
+	void _setup(const Dictionary &p_settings) override;
 
 	void set_node_type(NodeType p_node_type) override;
-	void _select_set_mode(SelectMode p_mode);
+	void _set_select_mode(SelectMode p_mode);
 
-	void _set_camera_override_enabled(bool p_enabled);
-
-	void _root_window_input(const Ref<InputEvent> &p_event);
+	void _window_input_event(const Ref<InputEvent> &p_event) override;
 	void _items_popup_index_pressed(int p_index, PopupMenu *p_popup);
 	void _update_input_state();
 
@@ -426,34 +475,15 @@ private:
 	void _find_canvas_items_at_rect(const Rect2 &p_rect, Node *p_node, Vector<SelectResult> &r_items, const Transform2D &p_parent_xform = Transform2D(), const Transform2D &p_canvas_xform = Transform2D());
 	void _pan_callback(Vector2 p_scroll_vec, Ref<InputEvent> p_event);
 	void _zoom_callback(float p_zoom_factor, Vector2 p_origin, Ref<InputEvent> p_event);
-	void _reset_camera_2d();
-	void _update_view_2d();
 
 #ifndef _3D_DISABLED
 	void _find_3d_items_at_pos(const Point2 &p_pos, Vector<SelectResult> &r_items);
 	void _find_3d_items_at_rect(const Rect2 &p_rect, Vector<SelectResult> &r_items);
-	Vector3 _get_screen_to_space(const Vector3 &p_vector3);
-
-	bool _handle_3d_input(const Ref<InputEvent> &p_event);
-	void _set_camera_freelook_enabled(bool p_enabled);
-	void _cursor_scale_distance(real_t p_scale);
-	void _scale_freelook_speed(real_t p_scale);
-	void _cursor_look(Ref<InputEventWithModifiers> p_event);
-	void _cursor_pan(Ref<InputEventWithModifiers> p_event);
-	void _cursor_orbit(Ref<InputEventWithModifiers> p_event);
-	Point2 _get_warped_mouse_motion(const Ref<InputEventMouseMotion> &p_event, Rect2 p_border) const;
-	Transform3D _get_cursor_transform();
-	void _reset_camera_3d();
 #endif // _3D_DISABLED
 
-	RuntimeNodeSelect() : RuntimeTool(TOOL_SELECT) { }
-	// RuntimeNodeSelect() : RuntimeTool(TOOL_SELECT) { singleton = this; }
-
-	// inline static RuntimeNodeSelect *singleton = nullptr;
+	RuntimeNodeSelect();
 
 public:
-	// static RuntimeNodeSelect *get_singleton();
-
 	~RuntimeNodeSelect();
 };
 
