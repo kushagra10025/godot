@@ -43,6 +43,8 @@
 class CanvasItem;
 class LiveEditor;
 class PopupMenu;
+class RuntimeViewContext;
+class RuntimeTool;
 class RuntimeNodeSelect;
 class RuntimeToolManager;
 class Script;
@@ -229,7 +231,60 @@ public:
 	static LiveEditor *get_singleton();
 };
 
-class RuntimeViewContext {
+class RuntimeToolManager : public Object {
+	GDCLASS(RuntimeToolManager, Object);
+
+	friend class SceneDebugger;
+
+public:
+	enum NodeType {
+		NODE_TYPE_NONE,
+		NODE_TYPE_2D,
+		NODE_TYPE_3D,
+		NODE_TYPE_MAX
+	};
+
+private:
+	RuntimeToolManager();
+	inline static RuntimeToolManager *singleton = nullptr;
+
+public:
+	static RuntimeToolManager *get_singleton() { return singleton; }
+	~RuntimeToolManager();
+
+private:
+	HashMap<StringName, RuntimeTool *> tools;
+	RuntimeTool *active_tool = nullptr;
+	RuntimeViewContext *view_context = nullptr;
+
+	NodeType active_node_type = NODE_TYPE_2D;
+
+public:
+	void register_tool(RuntimeTool *p_tool);
+
+	void set_active_tool(StringName p_tool);
+	RuntimeTool *get_active_tool() const { return active_tool; }
+	void set_active_node_type(NodeType p_type) { active_node_type = p_type; }
+	NodeType get_active_node_type() const { return active_node_type; }
+	RuntimeViewContext *get_view_context() const { return view_context; }
+
+	void setup(const Dictionary &p_settings);
+	void window_input_event(const Ref<InputEvent> &p_event);
+	void process_frame();
+	void physics_frame();
+
+	template <typename T, typename = std::enable_if_t<std::is_base_of_v<RuntimeTool, T>>>
+	T *get_tool() const {
+		if (tools.has(T::get_class_static())) {
+			return Object::cast_to<T>(tools[T::get_class_static()]);
+		}
+
+		return nullptr;
+	}
+};
+
+class RuntimeViewContext : public Object {
+	GDCLASS(RuntimeViewContext, Object);
 
 private:
 	bool camera_override = false;
@@ -238,6 +293,12 @@ private:
 	bool camera_freelook = false;
 #endif // _3D_DISABLED
 
+	void _pan_callback(Vector2 p_scroll_vec, Ref<InputEvent> p_event);
+	void _zoom_callback(float p_zoom_factor, Vector2 p_origin, Ref<InputEvent> p_event);
+
+	Callable panner_pan_callback;
+	Callable panner_zoom_callback;
+
 public:
 	virtual ~RuntimeViewContext() = default;
 	// Values taken from EditorZoomWidget.
@@ -245,6 +306,8 @@ public:
 	const float VIEW_2D_MAX_ZOOM = 128;
 
 	Ref<ViewPanner> panner;
+	void set_panner_pan_callback(Callable p_pan_callback);
+	void set_panner_zoom_callback(Callable p_zoom_callback);
 
 	Vector2 view_2d_offset;
 	real_t view_2d_zoom = 1.0;
@@ -302,6 +365,9 @@ public:
 	Vector2 previous_mouse_position;
 #endif // _3D_DISABLED
 
+	void setup(const Dictionary &p_settings);
+	void process_frame();
+
 	bool get_camera_override() const { return camera_override; };
 
 	void set_camera_override_enabled(bool p_enabled);
@@ -310,7 +376,11 @@ public:
 	virtual void update_view_2d();
 
 #ifndef _3D_DISABLED
+	bool get_camera_freelook() const { return camera_freelook; };
+
 	virtual void reset_camera_3d();
+
+	void update_input_state();
 
 	void cursor_scale_distance(real_t p_scale);
 	void cursor_look(Ref<InputEventWithModifiers> p_event);
@@ -322,8 +392,6 @@ public:
 	Vector3 get_screen_to_space(const Vector3 &p_vector3);
 	bool handle_3d_input(const Ref<InputEvent> &p_event);
 	void set_camera_freelook_enabled(bool p_enabled);
-
-	bool get_camera_freelook() const { return camera_freelook; };
 #endif // _3D_DISABLED
 };
 
@@ -331,40 +399,11 @@ class RuntimeTool : public Object {
 	GDCLASS(RuntimeTool, Object);
 
 	friend class RuntimeToolManager;
-public:
-	enum NodeType {
-		NODE_TYPE_NONE,
-		NODE_TYPE_2D,
-		NODE_TYPE_3D,
-		NODE_TYPE_MAX,
-	};
-
-	enum ToolType {
-		TOOL_SELECT,
-		TOOL_RULER,
-		TOOL_MAX,
-	};
-
-private:
-	NodeType node_type = NODE_TYPE_2D;
-	ToolType tool_type = TOOL_MAX;
-	bool active = false;
 protected:
-	RuntimeTool(ToolType p_type) : tool_type(p_type) { }
-
-	virtual void _setup(const Dictionary &p_settings);
+	virtual void _setup(const Dictionary &p_settings) { }
 	virtual void _window_input_event(const Ref<InputEvent> &p_event) { }
 	virtual void _process_frame() { }
 	virtual void _physics_frame() { }
-
-public:
-	virtual void activate() { active = true; }
-	virtual void deactivate() { active = false; }
-	bool is_activated() const { return active; }
-
-	virtual ToolType get_tool_type() const { return tool_type; }
-	virtual void set_node_type(NodeType p_node_type) { node_type = p_node_type; }
-	virtual NodeType get_node_type() const { return node_type; }
 };
 
 class RuntimeNodeSelect : public RuntimeTool {
@@ -416,8 +455,6 @@ private:
 
 	RID sbox_2d_ci;
 
-	RuntimeViewContext *view_context;
-
 #ifndef _3D_DISABLED
 	struct SelectionBox3D : public RefCounted {
 		RID instance;
@@ -450,12 +487,10 @@ private:
 
 	void _setup(const Dictionary &p_settings) override;
 
-	void set_node_type(NodeType p_node_type) override;
 	void _set_select_mode(SelectMode p_mode);
 
 	void _window_input_event(const Ref<InputEvent> &p_event) override;
 	void _items_popup_index_pressed(int p_index, PopupMenu *p_popup);
-	void _update_input_state();
 
 	void _process_frame() override;
 	void _physics_frame() override;
@@ -481,43 +516,10 @@ private:
 	void _find_3d_items_at_rect(const Rect2 &p_rect, Vector<SelectResult> &r_items);
 #endif // _3D_DISABLED
 
-	RuntimeNodeSelect();
+	RuntimeNodeSelect() = default;
 
 public:
 	~RuntimeNodeSelect();
-};
-
-class RuntimeToolManager : public Object {
-	GDCLASS(RuntimeToolManager, Object);
-
-	friend class SceneDebugger;
-private:
-	RuntimeToolManager() { singleton = this; }
-	inline static RuntimeToolManager *singleton = nullptr;
-
-public:
-	static RuntimeToolManager *get_singleton() { return singleton; }
-	~RuntimeToolManager();
-
-private:
-	RuntimeTool *active_tool = nullptr;
-	HashMap<RuntimeTool::ToolType, RuntimeTool *> tools;
-
-public:
-	void register_tool(RuntimeTool *p_tool);
-	void set_active_tool(RuntimeTool::ToolType p_tool);
-	RuntimeTool *get_active_tool() const { return active_tool; };
-
-	void process_frame();
-	void physics_frame();
-
-	template <class T>
-	T *get_tool(RuntimeTool::ToolType p_type) const {
-		if (tools.has(p_type)) {
-			return Object::cast_to<T>(tools.get(p_type));
-		}
-		return nullptr;
-	}
 };
 
 #endif // DEBUG_ENABLED

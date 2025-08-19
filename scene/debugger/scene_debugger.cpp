@@ -72,7 +72,7 @@ SceneDebugger::SceneDebugger() {
 	RuntimeToolManager::singleton = memnew(RuntimeToolManager);
 	RuntimeToolManager::get_singleton()->register_tool(memnew(RuntimeNodeSelect));
 
-	RuntimeToolManager::get_singleton()->set_active_tool(RuntimeTool::TOOL_SELECT);
+	RuntimeToolManager::get_singleton()->set_active_tool(RuntimeNodeSelect::get_class_static());
 
 	EngineDebugger::register_message_capture("scene", EngineDebugger::Capture(nullptr, SceneDebugger::parse_message));
 #endif // DEBUG_ENABLED
@@ -172,7 +172,7 @@ Error SceneDebugger::_msg_inspect_objects(const Array &p_args) {
 }
 
 Error SceneDebugger::_msg_clear_selection(const Array &p_args) {
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_clear_selection();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_clear_selection();
 	return OK;
 }
 
@@ -180,7 +180,7 @@ Error SceneDebugger::_msg_suspend_changed(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	bool suspended = p_args[0];
 	SceneTree::get_singleton()->set_suspend(suspended);
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_update_input_state();
+	RuntimeToolManager::get_singleton()->get_view_context()->update_input_state();
 	return OK;
 }
 
@@ -204,7 +204,7 @@ Error SceneDebugger::_msg_override_cameras(const Array &p_args) {
 #ifndef _3D_DISABLED
 	SceneTree::get_singleton()->get_root()->enable_camera_3d_override(enable);
 #endif // _3D_DISABLED
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->view_context->set_camera_override_enabled(enable && !from_editor);
+	RuntimeToolManager::get_singleton()->get_view_context()->set_camera_override_enabled(enable && !from_editor);
 	return OK;
 }
 
@@ -212,7 +212,7 @@ Error SceneDebugger::_msg_transform_camera_2d(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	Transform2D transform = p_args[0];
 	SceneTree::get_singleton()->get_root()->set_canvas_transform_override(transform);
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_queue_selection_update();
 	return OK;
 }
 
@@ -230,7 +230,7 @@ Error SceneDebugger::_msg_transform_camera_3d(const Array &p_args) {
 		SceneTree::get_singleton()->get_root()->set_camera_3d_override_orthogonal(size_or_fov, depth_near, depth_far);
 	}
 	SceneTree::get_singleton()->get_root()->set_camera_3d_override_transform(transform);
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_queue_selection_update();
 	return OK;
 }
 #endif // _3D_DISABLED
@@ -238,14 +238,14 @@ Error SceneDebugger::_msg_transform_camera_3d(const Array &p_args) {
 Error SceneDebugger::_msg_set_object_property(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.size() < 3, ERR_INVALID_DATA);
 	_set_object_property(p_args[0], p_args[1], p_args[2]);
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_queue_selection_update();
 	return OK;
 }
 
 Error SceneDebugger::_msg_set_object_property_field(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.size() < 4, ERR_INVALID_DATA);
 	_set_object_property(p_args[0], p_args[1], p_args[2], p_args[3]);
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_queue_selection_update();
 	return OK;
 }
 
@@ -356,14 +356,14 @@ Error SceneDebugger::_msg_live_instantiate_node(const Array &p_args) {
 Error SceneDebugger::_msg_live_remove_node(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	LiveEditor::get_singleton()->_remove_node_func(p_args[0]);
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_queue_selection_update();
 	return OK;
 }
 
 Error SceneDebugger::_msg_live_remove_and_keep_node(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.size() < 2, ERR_INVALID_DATA);
 	LiveEditor::get_singleton()->_remove_and_keep_node_func(p_args[0], p_args[1]);
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_queue_selection_update();
 	return OK;
 }
 
@@ -391,40 +391,42 @@ Error SceneDebugger::_msg_live_reparent_node(const Array &p_args) {
 
 Error SceneDebugger::_msg_runtime_node_select_setup(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty() || p_args[0].get_type() != Variant::DICTIONARY, ERR_INVALID_DATA);
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_setup(p_args[0]);
+	RuntimeToolManager::get_singleton()->setup(p_args[0]);
 	return OK;
 }
 
 Error SceneDebugger::_msg_runtime_node_select_set_type(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
-	RuntimeNodeSelect::NodeType type = (RuntimeNodeSelect::NodeType)(int)p_args[0];
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->set_node_type(type);
+	RuntimeToolManager::NodeType type = (RuntimeToolManager::NodeType)(int)p_args[0];
+	// NOTE RuntimeNodeSelect set_node_type had update_input_state together with setting node type value
+	RuntimeToolManager::get_singleton()->set_active_node_type(type);
+	RuntimeToolManager::get_singleton()->get_view_context()->update_input_state();
 	return OK;
 }
 
 Error SceneDebugger::_msg_runtime_node_select_set_mode(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	RuntimeNodeSelect::SelectMode mode = (RuntimeNodeSelect::SelectMode)(int)p_args[0];
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_set_select_mode(mode);
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_set_select_mode(mode);
 	return OK;
 }
 
 Error SceneDebugger::_msg_runtime_node_select_set_visible(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
 	bool visible = p_args[0];
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_set_selection_visible(visible);
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_set_selection_visible(visible);
 	return OK;
 }
 
 Error SceneDebugger::_msg_runtime_node_select_reset_camera_2d(const Array &p_args) {
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->view_context->reset_camera_2d();
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_view_context()->reset_camera_2d();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_queue_selection_update();
 	return OK;
 }
 #ifndef _3D_DISABLED
 Error SceneDebugger::_msg_runtime_node_select_reset_camera_3d(const Array &p_args) {
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->view_context->reset_camera_3d();
-	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT)->_queue_selection_update();
+	RuntimeToolManager::get_singleton()->get_view_context()->reset_camera_3d();
+	RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>()->_queue_selection_update();
 	return OK;
 }
 #endif // _3D_DISABLED
@@ -579,7 +581,7 @@ void SceneDebugger::_set_node_owner_recursive(Node *p_node, Node *p_owner) {
 void SceneDebugger::_send_object_ids(const Vector<ObjectID> &p_ids, bool p_update_selection) {
 	Vector<ObjectID> ids = p_ids;
 
-	RuntimeNodeSelect *select_tool = RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>(RuntimeTool::TOOL_SELECT);
+	RuntimeNodeSelect *select_tool = RuntimeToolManager::get_singleton()->get_tool<RuntimeNodeSelect>();
 	if (ids.size() > select_tool->max_selection) {
 		ids.resize(select_tool->max_selection);
 		EngineDebugger::get_singleton()->send_message("show_selection_limit_warning", Array());
@@ -1474,7 +1476,217 @@ void LiveEditor::_reparent_node_func(const NodePath &p_at, const NodePath &p_new
 	}
 }
 
+/// RuntimeToolManager
+RuntimeToolManager::RuntimeToolManager() {
+	singleton = this;
+	view_context = memnew(RuntimeViewContext);
+}
+
+RuntimeToolManager::~RuntimeToolManager() {
+	if (view_context) {
+		memdelete(view_context);
+	}
+
+	for (const KeyValue<StringName, RuntimeTool *> &tool : tools) {
+		if (tool.value) {
+			memdelete(tool.value);
+		}
+	}
+	tools.clear();
+}
+
+void RuntimeToolManager::register_tool(RuntimeTool *p_tool)
+{
+	if (p_tool) {
+		tools[p_tool->get_class_name()] = p_tool;
+	}
+}
+
+void RuntimeToolManager::set_active_tool(StringName p_tool) {
+	if (tools.has(p_tool)) {
+		active_tool = tools[p_tool];
+	}
+}
+
+void RuntimeToolManager::setup(const Dictionary &p_settings) {
+	Window *root = SceneTree::get_singleton()->get_root();
+	ERR_FAIL_COND(root->is_connected(SceneStringName(window_input), callable_mp(this, &RuntimeToolManager::window_input_event)));
+
+	root->connect(SceneStringName(window_input), callable_mp(this, &RuntimeToolManager::window_input_event));
+
+	if (view_context) {
+		view_context->setup(p_settings);
+	}
+
+	SceneTree::get_singleton()->connect("process_frame", callable_mp(this, &RuntimeToolManager::process_frame));
+	SceneTree::get_singleton()->connect("physics_frame", callable_mp(this, &RuntimeToolManager::physics_frame));
+
+	for (const KeyValue<StringName, RuntimeTool *> &tool : tools) {
+		if (tool.value) {
+			(tool.value)->_setup(p_settings);
+		}
+	}
+}
+
+void RuntimeToolManager::window_input_event(const Ref<InputEvent> &p_event) {
+	if (active_tool) {
+		active_tool->_window_input_event(p_event);
+	}
+}
+
+void RuntimeToolManager::process_frame() {
+	if (view_context) {
+		view_context->process_frame();
+	}
+
+	if (active_tool) {
+		active_tool->_process_frame();
+	}
+}
+
+void RuntimeToolManager::physics_frame() {
+	if (active_tool) {
+		active_tool->_physics_frame();
+	}
+}
+
 /// RuntimeViewContext
+void RuntimeViewContext::_pan_callback(Vector2 p_scroll_vec, Ref<InputEvent> p_event) {
+	Vector2 scroll = SceneTree::get_singleton()->get_root()->get_screen_transform().affine_inverse().xform(p_scroll_vec);
+	view_2d_offset.x -= scroll.x / view_2d_zoom;
+	view_2d_offset.y -= scroll.y / view_2d_zoom;
+
+	update_view_2d();
+
+	panner_pan_callback.call(p_scroll_vec, p_event);
+}
+
+void RuntimeViewContext::_zoom_callback(float p_zoom_factor, Vector2 p_origin, Ref<InputEvent> p_event) {
+	real_t prev_zoom = view_2d_zoom;
+	view_2d_zoom = CLAMP(view_2d_zoom * p_zoom_factor, VIEW_2D_MIN_ZOOM, VIEW_2D_MAX_ZOOM);
+
+	Vector2 pos = SceneTree::get_singleton()->get_root()->get_screen_transform().affine_inverse().xform(p_origin);
+	view_2d_offset += pos / prev_zoom - pos / view_2d_zoom;
+
+	// We want to align in-scene pixels to screen pixels, this prevents blurry rendering
+	// of small details (texts, lines).
+	// This correction adds a jitter movement when zooming, so we correct only when the
+	// zoom factor is an integer. (in the other cases, all pixels won't be aligned anyway)
+	const real_t closest_zoom_factor = Math::round(view_2d_zoom);
+	if (Math::is_zero_approx(view_2d_zoom - closest_zoom_factor)) {
+		// Make sure scene pixel at view_offset is aligned on a screen pixel.
+		Vector2 view_offset_int = view_2d_offset.floor();
+		Vector2 view_offset_frac = view_2d_offset - view_offset_int;
+		view_2d_offset = view_offset_int + (view_offset_frac * closest_zoom_factor).round() / closest_zoom_factor;
+	}
+
+	update_view_2d();
+
+	panner_zoom_callback.call(p_zoom_factor, p_origin, p_event);
+}
+
+void RuntimeViewContext::set_panner_pan_callback(Callable p_pan_callback) {
+	panner_pan_callback = p_pan_callback;
+}
+
+void RuntimeViewContext::set_panner_zoom_callback(Callable p_zoom_callback) {
+	panner_pan_callback = p_zoom_callback;
+}
+
+void RuntimeViewContext::setup(const Dictionary &p_settings) {
+	Window *root = SceneTree::get_singleton()->get_root();
+
+	panner.instantiate();
+	panner->set_callbacks(callable_mp(this, &RuntimeViewContext::_pan_callback), callable_mp(this, &RuntimeViewContext::_zoom_callback));
+
+	ViewPanner::ControlScheme panning_scheme = (ViewPanner::ControlScheme)p_settings.get("editors/panning/2d_editor_panning_scheme", 0).operator int();
+	bool simple_panning = p_settings.get("editors/panning/simple_panning", false);
+	int pan_speed = p_settings.get("editors/panning/2d_editor_pan_speed", 20);
+	Array keys = p_settings.get("canvas_item_editor/pan_view", Array()).operator Array();
+	panner->setup(panning_scheme, DebuggerMarshalls::deserialize_key_shortcut(keys), simple_panning);
+	panner->setup_warped_panning(root, p_settings.get("editors/panning/warped_mouse_panning", true));
+	panner->set_scroll_speed(pan_speed);
+
+#ifndef _3D_DISABLED
+	cursor = Cursor();
+
+	camera_fov = p_settings.get("editors/3d/default_fov", 70);
+	camera_znear = p_settings.get("editors/3d/default_z_near", 0.05);
+	camera_zfar = p_settings.get("editors/3d/default_z_far", 4'000);
+
+	invert_x_axis = p_settings.get("editors/3d/navigation/invert_x_axis", false);
+	invert_y_axis = p_settings.get("editors/3d/navigation/invert_y_axis", false);
+	warped_mouse_panning_3d = p_settings.get("editors/3d/navigation/warped_mouse_panning", true);
+
+	freelook_base_speed = p_settings.get("editors/3d/freelook/freelook_base_speed", 5);
+	freelook_sensitivity = Math::deg_to_rad((real_t)p_settings.get("editors/3d/freelook/freelook_sensitivity", 0.25));
+	orbit_sensitivity = Math::deg_to_rad((real_t)p_settings.get("editors/3d/navigation_feel/orbit_sensitivity", 0.004));
+	translation_sensitivity = p_settings.get("editors/3d/navigation_feel/translation_sensitivity", 1);
+#endif // _3D_DISABLED
+}
+
+void RuntimeViewContext::process_frame() {
+// TODO List Selection doesn't work when Camera Override is on (Manual Camera Adjustment)
+// Manual List Selection button works, but Shortcut (Ctrl + Alt + RMB) doesn't work
+#ifndef _3D_DISABLED
+	if (get_camera_freelook()) {
+		Transform3D transform = cursor.get_transform();
+		Vector3 forward = transform.basis.xform(Vector3(0, 0, -1));
+		const Vector3 right = transform.basis.xform(Vector3(1, 0, 0));
+		Vector3 up = transform.basis.xform(Vector3(0, 1, 0));
+
+		Vector3 direction;
+
+		Input *input = Input::get_singleton();
+		bool was_input_disabled = input->is_input_disabled();
+		if (was_input_disabled) {
+			input->set_disable_input(false);
+		}
+
+		if (input->is_physical_key_pressed(Key::A)) {
+			direction -= right;
+		}
+		if (input->is_physical_key_pressed(Key::D)) {
+			direction += right;
+		}
+		if (input->is_physical_key_pressed(Key::W)) {
+			direction += forward;
+		}
+		if (input->is_physical_key_pressed(Key::S)) {
+			direction -= forward;
+		}
+		if (input->is_physical_key_pressed(Key::E)) {
+			direction += up;
+		}
+		if (input->is_physical_key_pressed(Key::Q)) {
+			direction -= up;
+		}
+
+		real_t speed = freelook_base_speed;
+		if (input->is_physical_key_pressed(Key::SHIFT)) {
+			speed *= 3.0;
+		}
+		if (input->is_physical_key_pressed(Key::ALT)) {
+			speed *= 0.333333;
+		}
+
+		if (was_input_disabled) {
+			input->set_disable_input(true);
+		}
+
+		if (direction != Vector3()) {
+			// Calculate the process time manually, as the time scale is frozen.
+			const double process_time = (1.0 / Engine::get_singleton()->get_frames_per_second()) * Engine::get_singleton()->get_unfrozen_time_scale();
+			const Vector3 motion = direction * speed * process_time;
+			cursor.pos += motion;
+			cursor.eye_pos += motion;
+
+			SceneTree::get_singleton()->get_root()->set_camera_3d_override_transform(cursor.get_transform());
+		}
+	}
+#endif // _3D_DISABLED
+}
+
 void RuntimeViewContext::set_camera_override_enabled(bool p_enabled) {
 	camera_override = p_enabled;
 
@@ -1532,6 +1744,19 @@ void RuntimeViewContext::reset_camera_3d() {
 
 	root->set_camera_3d_override_transform(cursor.get_transform());
 	root->set_camera_3d_override_perspective(camera_fov * cursor.fov_scale, camera_znear, camera_zfar);
+}
+
+void RuntimeViewContext::update_input_state() {
+	// This function can be called at the very beginning, when the root hasn't entered the tree yet.
+	// So check first to avoid a crash.
+	if (!SceneTree::get_singleton()->get_root()->is_inside_tree()) {
+		return;
+	}
+
+	bool disable_input = SceneTree::get_singleton()->is_suspended() || RuntimeToolManager::get_singleton()->get_active_node_type() != RuntimeToolManager::NodeType::NODE_TYPE_NONE;
+	Input::get_singleton()->set_disable_input(disable_input);
+	Input::get_singleton()->set_mouse_mode_override_enabled(disable_input);
+	SceneTree::get_singleton()->get_root()->set_disable_input(disable_input);
 }
 
 void RuntimeViewContext::cursor_scale_distance(real_t p_scale) {
@@ -1763,24 +1988,9 @@ void RuntimeViewContext::set_camera_freelook_enabled(bool p_enabled) {
 		Input::get_singleton()->warp_mouse(previous_mouse_position);
 	}
 }
-
-void RuntimeTool::_setup(const Dictionary &p_settings) {
-	Window *root = SceneTree::get_singleton()->get_root();
-	ERR_FAIL_COND(root->is_connected(SceneStringName(window_input), callable_mp(this, &RuntimeTool::_window_input_event)));
-
-	root->connect(SceneStringName(window_input), callable_mp(this, &RuntimeTool::_window_input_event));
-
-	SceneTree::get_singleton()->connect("process_frame", callable_mp(this, &RuntimeTool::_process_frame));
-	SceneTree::get_singleton()->connect("physics_frame", callable_mp(this, &RuntimeTool::_physics_frame));
-}
 #endif // _3D_DISABLED
 
 /// RuntimeNodeSelect
-RuntimeNodeSelect::RuntimeNodeSelect() :
-	RuntimeTool(TOOL_SELECT) {
-	view_context = memnew(RuntimeViewContext);
-}
-
 RuntimeNodeSelect::~RuntimeNodeSelect() {
 	if (selection_list && !selection_list->is_visible()) {
 		memdelete(selection_list);
@@ -1799,18 +2009,12 @@ void RuntimeNodeSelect::_setup(const Dictionary &p_settings) {
 	Window *root = SceneTree::get_singleton()->get_root();
 	root->connect("size_changed", callable_mp(this, &RuntimeNodeSelect::_queue_selection_update), CONNECT_DEFERRED);
 
+	if (RuntimeToolManager::get_singleton()->get_view_context()) {
+		RuntimeToolManager::get_singleton()->get_view_context()->set_panner_pan_callback(callable_mp(this, &RuntimeNodeSelect::_pan_callback));
+		RuntimeToolManager::get_singleton()->get_view_context()->set_panner_zoom_callback(callable_mp(this, &RuntimeNodeSelect::_zoom_callback));
+	}
+
 	max_selection = p_settings.get("debugger/max_node_selection", 1);
-
-	view_context->panner.instantiate();
-	view_context->panner->set_callbacks(callable_mp(this, &RuntimeNodeSelect::_pan_callback), callable_mp(this, &RuntimeNodeSelect::_zoom_callback));
-
-	ViewPanner::ControlScheme panning_scheme = (ViewPanner::ControlScheme)p_settings.get("editors/panning/2d_editor_panning_scheme", 0).operator int();
-	bool simple_panning = p_settings.get("editors/panning/simple_panning", false);
-	int pan_speed = p_settings.get("editors/panning/2d_editor_pan_speed", 20);
-	Array keys = p_settings.get("canvas_item_editor/pan_view", Array()).operator Array();
-	view_context->panner->setup(panning_scheme, DebuggerMarshalls::deserialize_key_shortcut(keys), simple_panning);
-	view_context->panner->setup_warped_panning(root, p_settings.get("editors/panning/warped_mouse_panning", true));
-	view_context->panner->set_scroll_speed(pan_speed);
 
 	sel_2d_grab_dist = p_settings.get("editors/polygon_editor/point_grab_radius", 0);
 
@@ -1828,21 +2032,6 @@ void RuntimeNodeSelect::_setup(const Dictionary &p_settings) {
 	RS::get_singleton()->canvas_item_set_parent(sbox_2d_ci, draw_canvas);
 
 #ifndef _3D_DISABLED
-	view_context->cursor = RuntimeViewContext::Cursor();
-
-	view_context->camera_fov = p_settings.get("editors/3d/default_fov", 70);
-	view_context->camera_znear = p_settings.get("editors/3d/default_z_near", 0.05);
-	view_context->camera_zfar = p_settings.get("editors/3d/default_z_far", 4'000);
-
-	view_context->invert_x_axis = p_settings.get("editors/3d/navigation/invert_x_axis", false);
-	view_context->invert_y_axis = p_settings.get("editors/3d/navigation/invert_y_axis", false);
-	view_context->warped_mouse_panning_3d = p_settings.get("editors/3d/navigation/warped_mouse_panning", true);
-
-	view_context->freelook_base_speed = p_settings.get("editors/3d/freelook/freelook_base_speed", 5);
-	view_context->freelook_sensitivity = Math::deg_to_rad((real_t)p_settings.get("editors/3d/freelook/freelook_sensitivity", 0.25));
-	view_context->orbit_sensitivity = Math::deg_to_rad((real_t)p_settings.get("editors/3d/navigation_feel/orbit_sensitivity", 0.004));
-	view_context->translation_sensitivity = p_settings.get("editors/3d/navigation_feel/translation_sensitivity", 1);
-
 	/// 3D Selection Box Generation
 	// Copied from the Node3DEditor implementation.
 
@@ -1889,12 +2078,7 @@ void RuntimeNodeSelect::_setup(const Dictionary &p_settings) {
 
 	// This function will be called before the root enters the tree at first when the Game view is passing its settings to
 	// the debugger, so queue the update for after it enters.
-	root->connect(SceneStringName(tree_entered), callable_mp(this, &RuntimeNodeSelect::_update_input_state), Object::CONNECT_ONE_SHOT);
-}
-
-void RuntimeNodeSelect::set_node_type(NodeType p_node_type) {
-	__super::set_node_type(p_node_type);
-	_update_input_state();
+	root->connect(SceneStringName(tree_entered), callable_mp(RuntimeToolManager::get_singleton()->get_view_context(), &RuntimeViewContext::update_input_state), Object::CONNECT_ONE_SHOT);
 }
 
 void RuntimeNodeSelect::_set_select_mode(SelectMode p_mode) {
@@ -1903,7 +2087,8 @@ void RuntimeNodeSelect::_set_select_mode(SelectMode p_mode) {
 
 void RuntimeNodeSelect::_window_input_event(const Ref<InputEvent> &p_event) {
 	Window *root = SceneTree::get_singleton()->get_root();
-	if (get_node_type() == NODE_TYPE_NONE || (selection_list && selection_list->is_visible())) {
+	RuntimeToolManager::NodeType active_node_type = RuntimeToolManager::get_singleton()->get_active_node_type();
+	if (active_node_type == RuntimeToolManager::NodeType::NODE_TYPE_NONE || (selection_list && selection_list->is_visible())) {
 		// Workaround for platforms that don't allow subwindows.
 		if (selection_list && selection_list->is_visible() && selection_list->is_embedded()) {
 			root->set_disable_input_override(false);
@@ -1915,12 +2100,12 @@ void RuntimeNodeSelect::_window_input_event(const Ref<InputEvent> &p_event) {
 	}
 
 	bool is_dragging_camera = false;
-	if (view_context->get_camera_override()) {
-		if (get_node_type() == NODE_TYPE_2D) {
-			is_dragging_camera = view_context->panner->gui_input(p_event, Rect2(Vector2(), root->get_visible_rect().get_size()));
+	if (RuntimeToolManager::get_singleton()->get_view_context()->get_camera_override()) {
+		if (active_node_type == RuntimeToolManager::NodeType::NODE_TYPE_2D) {
+			is_dragging_camera = RuntimeToolManager::get_singleton()->get_view_context()->panner->gui_input(p_event, Rect2(Vector2(), root->get_visible_rect().get_size()));
 #ifndef _3D_DISABLED
-		} else if (get_node_type() == NODE_TYPE_3D && selection_drag_state == SELECTION_DRAG_NONE) {
-			if (view_context->handle_3d_input(p_event)) {
+		} else if (active_node_type == RuntimeToolManager::NodeType::NODE_TYPE_3D && selection_drag_state == SELECTION_DRAG_NONE) {
+			if (RuntimeToolManager::get_singleton()->get_view_context()->handle_3d_input(p_event)) {
 				return;
 			}
 #endif // _3D_DISABLED
@@ -1978,79 +2163,7 @@ void RuntimeNodeSelect::_items_popup_index_pressed(int p_index, PopupMenu *p_pop
 	}
 }
 
-void RuntimeNodeSelect::_update_input_state() {
-	SceneTree *scene_tree = SceneTree::get_singleton();
-	// This function can be called at the very beginning, when the root hasn't entered the tree yet.
-	// So check first to avoid a crash.
-	if (!scene_tree->get_root()->is_inside_tree()) {
-		return;
-	}
-
-	bool disable_input = scene_tree->is_suspended() || get_node_type() != RuntimeTool::NodeType::NODE_TYPE_NONE;
-	Input::get_singleton()->set_disable_input(disable_input);
-	Input::get_singleton()->set_mouse_mode_override_enabled(disable_input);
-	scene_tree->get_root()->set_disable_input_override(disable_input);
-}
-
 void RuntimeNodeSelect::_process_frame() {
-#ifndef _3D_DISABLED
-	if (view_context->get_camera_freelook()) {
-		Transform3D transform = view_context->cursor.get_transform();
-		Vector3 forward = transform.basis.xform(Vector3(0, 0, -1));
-		const Vector3 right = transform.basis.xform(Vector3(1, 0, 0));
-		Vector3 up = transform.basis.xform(Vector3(0, 1, 0));
-
-		Vector3 direction;
-
-		Input *input = Input::get_singleton();
-		bool was_input_disabled = input->is_input_disabled();
-		if (was_input_disabled) {
-			input->set_disable_input(false);
-		}
-
-		if (input->is_physical_key_pressed(Key::A)) {
-			direction -= right;
-		}
-		if (input->is_physical_key_pressed(Key::D)) {
-			direction += right;
-		}
-		if (input->is_physical_key_pressed(Key::W)) {
-			direction += forward;
-		}
-		if (input->is_physical_key_pressed(Key::S)) {
-			direction -= forward;
-		}
-		if (input->is_physical_key_pressed(Key::E)) {
-			direction += up;
-		}
-		if (input->is_physical_key_pressed(Key::Q)) {
-			direction -= up;
-		}
-
-		real_t speed = view_context->freelook_base_speed;
-		if (input->is_physical_key_pressed(Key::SHIFT)) {
-			speed *= 3.0;
-		}
-		if (input->is_physical_key_pressed(Key::ALT)) {
-			speed *= 0.333333;
-		}
-
-		if (was_input_disabled) {
-			input->set_disable_input(true);
-		}
-
-		if (direction != Vector3()) {
-			// Calculate the process time manually, as the time scale is frozen.
-			const double process_time = (1.0 / Engine::get_singleton()->get_frames_per_second()) * Engine::get_singleton()->get_unfrozen_time_scale();
-			const Vector3 motion = direction * speed * process_time;
-			view_context->cursor.pos += motion;
-			view_context->cursor.eye_pos += motion;
-
-			SceneTree::get_singleton()->get_root()->set_camera_3d_override_transform(view_context->cursor.get_transform());
-		}
-	}
-#endif // _3D_DISABLED
-
 	if (selection_update_queued || !SceneTree::get_singleton()->is_suspended()) {
 		selection_update_queued = false;
 		if (has_selection) {
@@ -2060,6 +2173,7 @@ void RuntimeNodeSelect::_process_frame() {
 }
 
 void RuntimeNodeSelect::_physics_frame() {
+	RuntimeToolManager::NodeType active_node_type = RuntimeToolManager::get_singleton()->get_active_node_type();
 	if (selection_drag_state != SELECTION_DRAG_END && (selection_drag_state == SELECTION_DRAG_MOVE || Math::is_inf(selection_position.x))) {
 		return;
 	}
@@ -2068,7 +2182,7 @@ void RuntimeNodeSelect::_physics_frame() {
 	bool selection_drag_valid = selection_drag_state == SELECTION_DRAG_END && selection_drag_area.get_area() > SELECTION_MIN_AREA;
 	Vector<SelectResult> items;
 
-	if (get_node_type() == NODE_TYPE_2D) {
+	if (active_node_type == RuntimeToolManager::NodeType::NODE_TYPE_2D) {
 		if (selection_drag_valid) {
 			for (int i = 0; i < root->get_child_count(); i++) {
 				_find_canvas_items_at_rect(selection_drag_area, root->get_child(i), items);
@@ -2092,7 +2206,7 @@ void RuntimeNodeSelect::_physics_frame() {
 			}
 		}
 #ifndef _3D_DISABLED
-	} else if (get_node_type() == NODE_TYPE_3D) {
+	} else if (active_node_type == RuntimeToolManager::NodeType::NODE_TYPE_3D) {
 		if (selection_drag_valid) {
 			_find_3d_items_at_rect(selection_drag_area, items);
 		} else {
@@ -2541,7 +2655,7 @@ void RuntimeNodeSelect::_update_selection_drag(const Point2 &p_end_pos) {
 
 		selection_drawing.position = xform.affine_inverse().xform(selection_drag_area.position);
 		selection_drawing.size = xform.affine_inverse().xform(p_end_pos);
-		thickness = MAX(1, Math::ceil(1 / view_context->view_2d_zoom));
+		thickness = MAX(1, Math::ceil(1 / RuntimeToolManager::get_singleton()->get_view_context()->view_2d_zoom));
 	} else {
 		RS::get_singleton()->canvas_item_set_transform(sel_drag_ci, Transform2D());
 		RS::get_singleton()->canvas_item_reset_physics_interpolation(sel_drag_ci);
@@ -2644,7 +2758,7 @@ void RuntimeNodeSelect::_find_canvas_items_at_pos(const Point2 &p_pos, Node *p_n
 	}
 
 	xform = (xform * ci->get_transform()).affine_inverse();
-	const real_t local_grab_distance = xform.basis_xform(Vector2(sel_2d_grab_dist, 0)).length() / view_context->view_2d_zoom;
+	const real_t local_grab_distance = xform.basis_xform(Vector2(sel_2d_grab_dist, 0)).length() / RuntimeToolManager::get_singleton()->get_view_context()->view_2d_zoom;
 	if (ci->_edit_is_selected_on_click(xform.xform(pos), local_grab_distance)) {
 		SelectResult res;
 		res.item = ci;
@@ -2728,35 +2842,11 @@ void RuntimeNodeSelect::_find_canvas_items_at_rect(const Rect2 &p_rect, Node *p_
 }
 
 void RuntimeNodeSelect::_pan_callback(Vector2 p_scroll_vec, Ref<InputEvent> p_event) {
-	Vector2 scroll = SceneTree::get_singleton()->get_root()->get_screen_transform().affine_inverse().xform(p_scroll_vec);
-	view_context->view_2d_offset.x -= scroll.x / view_context->view_2d_zoom;
-	view_context->view_2d_offset.y -= scroll.y / view_context->view_2d_zoom;
-
-	view_context->update_view_2d();
 	_queue_selection_update();
 }
 
 // A very shallow copy of the same function inside CanvasItemEditor.
 void RuntimeNodeSelect::_zoom_callback(float p_zoom_factor, Vector2 p_origin, Ref<InputEvent> p_event) {
-	real_t prev_zoom = view_context->view_2d_zoom;
-	view_context->view_2d_zoom = CLAMP(view_context->view_2d_zoom * p_zoom_factor, view_context->VIEW_2D_MIN_ZOOM, view_context->VIEW_2D_MAX_ZOOM);
-
-	Vector2 pos = SceneTree::get_singleton()->get_root()->get_screen_transform().affine_inverse().xform(p_origin);
-	view_context->view_2d_offset += pos / prev_zoom - pos / view_context->view_2d_zoom;
-
-	// We want to align in-scene pixels to screen pixels, this prevents blurry rendering
-	// of small details (texts, lines).
-	// This correction adds a jitter movement when zooming, so we correct only when the
-	// zoom factor is an integer. (in the other cases, all pixels won't be aligned anyway)
-	const real_t closest_zoom_factor = Math::round(view_context->view_2d_zoom);
-	if (Math::is_zero_approx(view_context->view_2d_zoom - closest_zoom_factor)) {
-		// Make sure scene pixel at view_offset is aligned on a screen pixel.
-		Vector2 view_offset_int = view_context->view_2d_offset.floor();
-		Vector2 view_offset_frac = view_context->view_2d_offset - view_offset_int;
-		view_context->view_2d_offset = view_offset_int + (view_offset_frac * closest_zoom_factor).round() / closest_zoom_factor;
-	}
-
-	view_context->update_view_2d();
 	_queue_selection_update();
 }
 // TODO: Call _queue_selection_update with update_view_2d and reset_view_2d
@@ -2797,6 +2887,7 @@ void RuntimeNodeSelect::_find_3d_items_at_pos(const Point2 &p_pos, Vector<Select
 			res.item = Object::cast_to<Node>(result.collider);
 			res.order = -pos.distance_to(result.position);
 
+			// FIXME When an item has a collision object, it is registered twice in the list.
 			// Fetch collision shapes.
 			CollisionObject3D *collision = Object::cast_to<CollisionObject3D>(result.collider);
 			if (collision) {
@@ -2902,8 +2993,8 @@ void RuntimeNodeSelect::_find_3d_items_at_rect(const Rect2 &p_rect, Vector<Selec
 
 	Vector<Plane> frustum;
 	for (int i = 0; i < 4; i++) {
-		Vector3 a = view_context->get_screen_to_space(box[i]);
-		Vector3 b = view_context->get_screen_to_space(box[(i + 1) % 4]);
+		Vector3 a = RuntimeToolManager::get_singleton()->get_view_context()->get_screen_to_space(box[i]);
+		Vector3 b = RuntimeToolManager::get_singleton()->get_view_context()->get_screen_to_space(box[(i + 1) % 4]);
 		frustum.push_back(Plane(a, b, cam_pos));
 	}
 
@@ -2994,40 +3085,5 @@ void RuntimeNodeSelect::_find_3d_items_at_rect(const Rect2 &p_rect, Vector<Selec
 	}
 }
 #endif // _3D_DISABLED
-
-/// RuntimeToolManager
-RuntimeToolManager::~RuntimeToolManager() {
-	for (KeyValue<RuntimeTool::ToolType, RuntimeTool *> tool : tools) {
-		if (tool.value) {
-			memdelete(tool.value);
-		}
-	}
-	tools.clear();
-}
-
-void RuntimeToolManager::register_tool(RuntimeTool *p_tool)
-{
-	if (p_tool) {
-		tools[p_tool->get_tool_type()] = p_tool;
-	}
-}
-
-void RuntimeToolManager::set_active_tool(RuntimeTool::ToolType p_tool) {
-	if (tools.has(p_tool)) {
-		active_tool = tools[p_tool];
-	}
-}
-
-void RuntimeToolManager::process_frame() {
-	if (active_tool) {
-		active_tool->_process_frame();
-	}
-}
-
-void RuntimeToolManager::physics_frame() {
-	if (active_tool) {
-		active_tool->_physics_frame();
-	}
-}
 
 #endif // DEBUG_ENABLED
