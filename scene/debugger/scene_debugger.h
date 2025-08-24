@@ -40,6 +40,9 @@
 #include "scene/resources/mesh.h"
 #endif // _3D_DISABLED
 
+class MeshInstance3D;
+class ImmediateMesh;
+class Label3D;
 class CanvasItem;
 class LiveEditor;
 class PopupMenu;
@@ -529,6 +532,19 @@ class RuntimeRulerTool : public RuntimeTool {
 private:
 	friend class SceneDebugger;
 
+	Node *ruler = nullptr;
+	Node3D *ruler_start_node = nullptr;
+	Node3D *ruler_end_node = nullptr;
+	Ref<ImmediateMesh> geometry;
+	MeshInstance3D *ruler_line = nullptr;
+	MeshInstance3D *ruler_line_xray = nullptr;
+	Ref<StandardMaterial3D> ruler_material;
+	Ref<StandardMaterial3D> ruler_material_xray;
+	Label3D *ruler_label = nullptr;
+
+	Vector2 mouse_pos = Vector2(0.0, 0.0);
+	bool _warped_mouse_panning_3d = false;
+
 	RuntimeRulerTool();
 	~RuntimeRulerTool();
 
@@ -537,6 +553,9 @@ private:
 	void _process_frame() override;
 	void _physics_frame() override;
 
+	Vector3 _get_instance_position(const Vector2 &p_pos, Node3D *p_node) const;
+	static AABB _calculate_spatial_bounds(const Node3D *p_parent, bool p_omit_top_level, const Transform3D *p_bounds_orientation);
+	Point2 _get_warped_mouse_motion(const Ref<InputEventMouseMotion> &p_ev_mouse_motion) const;
 };
 
 #endif // DEBUG_ENABLED

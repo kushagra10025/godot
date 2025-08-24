@@ -4567,12 +4567,14 @@ HashMap<StringName, real_t> Viewport::get_camera_3d_override_properties() const 
 	props["fov"] = 0;
 	props["z_near"] = 0;
 	props["z_far"] = 0;
+	props["projection"] = (real_t)Camera3DOverrideData::PROJECTION_PERSPECTIVE;
 	ERR_READ_THREAD_GUARD_V(props);
 
 	props["size"] = camera_3d_override.size;
 	props["fov"] = camera_3d_override.fov;
 	props["z_near"] = camera_3d_override.z_near;
 	props["z_far"] = camera_3d_override.z_far;
+	props["projection"] = (real_t)camera_3d_override.projection;
 	return props;
 }
 

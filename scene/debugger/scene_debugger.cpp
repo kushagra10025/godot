@@ -38,11 +38,18 @@
 #include "core/object/script_language.h"
 #include "core/os/time.h"
 #include "core/templates/local_vector.h"
+#include "editor/editor_string_names.h"
+#include "editor/themes/editor_scale.h"
+#include "scene/3d/label_3d.h"
+#include "scene/3d/mesh_instance_3d.h"
+#include "scene/gui/label.h"
 #include "scene/gui/popup_menu.h"
+#include "scene/gui/subviewport_container.h"
 #include "scene/main/canvas_layer.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
 #include "scene/resources/packed_scene.h"
+#include "scene/resources/immediate_mesh.h"
 #include "scene/theme/theme_db.h"
 #include "servers/audio_server.h"
 
@@ -3097,6 +3104,52 @@ void RuntimeNodeSelect::_find_3d_items_at_rect(const Rect2 &p_rect, Vector<Selec
 
 /// RuntimeRulerTool
 RuntimeRulerTool::RuntimeRulerTool() {
+	ruler_material.instantiate();
+	ruler_material->set_albedo(Color(1.0, 0.9, 0.0, 1.0));
+	ruler_material->set_flag(BaseMaterial3D::FLAG_DISABLE_FOG, true);
+	ruler_material->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
+	ruler_material->set_depth_draw_mode(BaseMaterial3D::DEPTH_DRAW_DISABLED);
+
+	ruler_material_xray.instantiate();
+	ruler_material_xray->set_albedo(Color(1.0, 0.9, 0.0, 0.15));
+	ruler_material_xray->set_flag(BaseMaterial3D::FLAG_DISABLE_FOG, true);
+	ruler_material_xray->set_shading_mode(BaseMaterial3D::SHADING_MODE_UNSHADED);
+	ruler_material_xray->set_flag(BaseMaterial3D::FLAG_DISABLE_DEPTH_TEST, true);
+	ruler_material_xray->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
+	ruler_material_xray->set_render_priority(BaseMaterial3D::RENDER_PRIORITY_MAX);
+
+	ruler_label = memnew(Label3D);
+	ruler_label->set_visible(false);
+	ruler_label->set_billboard_mode(StandardMaterial3D::BILLBOARD_ENABLED);
+	ruler_label->set_draw_flag(Label3D::FLAG_DISABLE_DEPTH_TEST, true);
+	ruler_label->set_draw_flag(Label3D::FLAG_FIXED_SIZE, true);
+	ruler_label->set_modulate(Color(1.0, 0.9, 0.0, 1.0));
+	ruler_label->set_outline_modulate(Color(0.0, 0.0, 0.0, 1.0));
+	ruler_label->set_font_size(8 * EDSCALE);
+	ruler_label->set_outline_size(4 * EDSCALE);
+
+	ruler_start_node = memnew(Node3D);
+	ruler_start_node->set_visible(false);
+
+	ruler_end_node = memnew(Node3D);
+	ruler_end_node->set_visible(false);
+
+	geometry.instantiate();
+
+	ruler_line = memnew(MeshInstance3D);
+	ruler_line->set_mesh(geometry);
+	ruler_line->set_material_override(ruler_material);
+
+	ruler_line_xray = memnew(MeshInstance3D);
+	ruler_line_xray->set_mesh(geometry);
+	ruler_line_xray->set_material_override(ruler_material_xray);
+
+	ruler = memnew(Node);
+	ruler->add_child(ruler_start_node);
+	ruler->add_child(ruler_end_node);
+	ruler->add_child(ruler_line);
+	ruler->add_child(ruler_line_xray);
+	ruler->add_child(ruler_label);
 
 }
 
@@ -3105,19 +3158,218 @@ RuntimeRulerTool::~RuntimeRulerTool() {
 }
 
 void RuntimeRulerTool::_setup(const Dictionary &p_settings) {
-
+	_warped_mouse_panning_3d = p_settings.get("editors/3d/navigation/warped_mouse_panning", true);
 }
 
 void RuntimeRulerTool::_window_input_event(const Ref<InputEvent> &p_event) {
+	Ref<InputEventMouseButton> b = p_event;
+	if (b.is_valid()) {
+		mouse_pos = b->get_position();
+		switch (b->get_button_index()) {
+			case MouseButton::LEFT:
+				if (b->is_pressed()) {
+					SceneTree::get_singleton()->get_root()->add_child(ruler);
+				}else {
+					if (ruler->is_inside_tree()) {
+						SceneTree::get_singleton()->get_root()->remove_child(ruler);
 
+						geometry->clear_surfaces();
+						ruler_start_node->set_visible(false);
+						ruler_end_node->set_visible(false);
+						ruler_label->set_visible(false);
+					}
+				}
+				break;
+			default:
+				break;
+		}
+	}
+
+	Ref<InputEventMouseMotion> m = p_event;
+	if (m.is_valid()) {
+		mouse_pos += _get_warped_mouse_motion(p_event);
+	}
 }
 
 void RuntimeRulerTool::_process_frame() {
-	WARN_PRINT_ONCE("Active Tool is Runtime Ruler Tool");
+	if (!ruler->is_inside_tree()) {
+		return;
+	}
+
+	Vector3 start_pos = ruler_start_node->get_global_position();
+	Vector3 end_pos = ruler_end_node->get_global_position();
+
+	geometry->clear_surfaces();
+	geometry->surface_begin(Mesh::PRIMITIVE_LINES);
+	geometry->surface_add_vertex(start_pos);
+	geometry->surface_add_vertex(end_pos);
+	geometry->surface_end();
+
+	float distance = start_pos.distance_to(end_pos);
+	ruler_label->set_text(TS->format_number(vformat("%.3f m", distance)));
+
+	Vector3 center = (start_pos + end_pos) / 2;
+	ruler_label->set_position(center);
 }
 
 void RuntimeRulerTool::_physics_frame() {
+	if (!ruler->is_inside_tree()) {
+		return;
+	}
 
+	Node3D *selected_node = nullptr;
+	if (ruler_start_node->is_visible()) {
+		selected_node = ruler_end_node;
+	}else {
+		selected_node = ruler_start_node;
+	}
+
+	// WARN_PRINT(vformat("Mouse Pos : [x: %0.2f, y: %0.2f]", mouse_pos.x, mouse_pos.y));
+	if (selected_node) {
+		selected_node->set_global_position(_get_instance_position(mouse_pos, selected_node));
+
+		if (!ruler_start_node->is_visible()) {
+			ruler_end_node->set_global_position(ruler_start_node->get_global_position());
+			ruler_start_node->set_visible(true);
+			ruler_end_node->set_visible(true);
+			ruler_label->set_visible(true);
+		}
+	}
+}
+
+Vector3 RuntimeRulerTool::_get_instance_position(const Vector2 &p_pos, Node3D *p_node) const {
+	Window *root = SceneTree::get_singleton()->get_root();
+
+	const float MAX_DISTANCE = 50.0;
+	const float FALLBACK_DISTANCE = 5.0;
+
+	Vector3 ray, pos, to;
+	bool is_orthogonal = false;
+	if (root->is_camera_3d_override_enabled()) {
+		ray = root->camera_3d_override_project_ray_normal(p_pos);
+		pos = root->camera_3d_override_project_ray_origin(p_pos);
+		to = pos + ray * root->get_camera_3d_override_properties()["z_far"];
+		is_orthogonal = root->get_camera_3d_override_properties()["projection"] == Camera3D::PROJECTION_ORTHOGONAL;
+	}else {
+		Camera3D *camera = root->get_camera_3d();
+		if (!camera) {
+			return p_node->get_global_position();
+		}
+
+		ray = camera->project_ray_normal(p_pos);
+		pos = camera->project_ray_origin(p_pos);
+		to = pos + ray * camera->get_far();
+		is_orthogonal = camera->get_projection() == Camera3D::PROJECTION_ORTHOGONAL;
+	}
+
+#ifndef PHYSICS_3D_DISABLED
+	PhysicsDirectSpaceState3D *ss = root->get_world_3d()->get_direct_space_state();
+	PhysicsDirectSpaceState3D::RayResult result;
+	HashSet<RID> excluded;
+	PhysicsDirectSpaceState3D::RayParameters ray_params;
+	ray_params.from = pos;
+	ray_params.to = to;
+	ray_params.exclude = excluded;
+
+	if (ss->intersect_ray(ray_params, result)) {
+		// Calculate an offset for the `p_node` such that the its bounding box is on top of and touching the contact surface's plane.
+
+		// Use the Gram-Schmidt process to get an orthonormal Basis aligned with the surface normal.
+		const Vector3 bb_basis_x = result.normal;
+		Vector3 bb_basis_y = Vector3(0, 1, 0);
+		bb_basis_y = bb_basis_y - bb_basis_y.project(bb_basis_x);
+		if (bb_basis_y.is_zero_approx()) {
+			bb_basis_y = Vector3(0, 0, 1);
+			bb_basis_y = bb_basis_y - bb_basis_y.project(bb_basis_x);
+		}
+		bb_basis_y = bb_basis_y.normalized();
+		const Vector3 bb_basis_z = bb_basis_x.cross(bb_basis_y);
+		const Basis bb_basis = Basis(bb_basis_x, bb_basis_y, bb_basis_z);
+
+		// This normal-aligned Basis allows us to create an AABB that can fit on the surface plane as snugly as possible.
+		const Transform3D bb_transform = Transform3D(bb_basis, p_node->get_transform().origin);
+		const AABB p_node_bb = _calculate_spatial_bounds(p_node, true, &bb_transform);
+		// The x-axis's alignment with the surface normal also makes it trivial to get the distance from `p_node`'s origin at (0, 0, 0) to the correct AABB face.
+		const float offset_distance = -p_node_bb.position.x;
+
+		// `result_offset` is in global space.
+		const Vector3 result_offset = result.position + result.normal * offset_distance;
+
+		return result_offset;
+	}
+
+#endif // PHYSICS_3D_DISABLED
+
+	// The XZ plane.
+	Vector3 intersection;
+	Plane plane(Vector3(0, 1, 0));
+	if (plane.intersects_ray(pos, ray, &intersection)) {
+		if (is_orthogonal || pos.distance_to(intersection) <= MAX_DISTANCE) {
+			return intersection;
+		}
+	}
+
+	RuntimeViewContext::Cursor cursor = RuntimeToolManager::get_singleton()->get_view_context()->cursor;
+
+	// Plane facing the camera using fallback distance.
+	if (is_orthogonal) {
+		plane = Plane(ray, cursor.pos - ray * (cursor.distance - FALLBACK_DISTANCE));
+	} else {
+		plane = Plane(ray, pos + ray * FALLBACK_DISTANCE);
+	}
+	if (plane.intersects_ray(pos, ray, &intersection)) {
+		return intersection;
+	}
+
+	return pos + ray * FALLBACK_DISTANCE;
+}
+
+AABB RuntimeRulerTool::_calculate_spatial_bounds(const Node3D *p_parent, bool p_omit_top_level, const Transform3D *p_bounds_orientation) {
+	if (!p_parent) {
+		return AABB(Vector3(-0.2, -0.2, -0.2), Vector3(0.4, 0.4, 0.4));
+	}
+	const Transform3D parent_transform = p_parent->get_global_transform();
+	if (!parent_transform.is_finite()) {
+		return AABB();
+	}
+	AABB bounds;
+
+	Transform3D bounds_orientation;
+	Transform3D xform_to_top_level_parent_space;
+	if (p_bounds_orientation) {
+		bounds_orientation = *p_bounds_orientation;
+		xform_to_top_level_parent_space = bounds_orientation.affine_inverse() * parent_transform;
+	} else {
+		bounds_orientation = parent_transform;
+	}
+
+	const VisualInstance3D *visual_instance = Object::cast_to<VisualInstance3D>(p_parent);
+	if (visual_instance) {
+		bounds = visual_instance->get_aabb();
+	} else {
+		bounds = AABB();
+	}
+	bounds = xform_to_top_level_parent_space.xform(bounds);
+
+	for (int i = 0; i < p_parent->get_child_count(); i++) {
+		const Node3D *child = Object::cast_to<Node3D>(p_parent->get_child(i));
+		if (child && !(p_omit_top_level && child->is_set_as_top_level())) {
+			const AABB child_bounds = _calculate_spatial_bounds(child, p_omit_top_level, &bounds_orientation);
+			bounds.merge_with(child_bounds);
+		}
+	}
+
+	return bounds;
+}
+
+Vector2 RuntimeRulerTool::_get_warped_mouse_motion(const Ref<InputEventMouseMotion> &p_ev_mouse_motion) const {
+	Vector2 relative;
+	if (_warped_mouse_panning_3d) {
+		relative = Input::get_singleton()->warp_mouse_motion(p_ev_mouse_motion, SceneTree::get_singleton()->get_root()->get_viewport()->get_visible_rect());
+	} else {
+		relative = p_ev_mouse_motion->get_relative();
+	}
+	return relative;
 }
 
 #endif // DEBUG_ENABLED
