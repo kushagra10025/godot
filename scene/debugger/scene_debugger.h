@@ -114,6 +114,7 @@ private:
 	static Error _msg_live_restore_node(const Array &p_args);
 	static Error _msg_live_duplicate_node(const Array &p_args);
 	static Error _msg_live_reparent_node(const Array &p_args);
+	static Error _msg_runtime_tool_active_tool_select(const Array &p_args);
 	static Error _msg_runtime_node_select_setup(const Array &p_args);
 	static Error _msg_runtime_node_select_set_type(const Array &p_args);
 	static Error _msg_runtime_node_select_set_mode(const Array &p_args);
@@ -520,6 +521,22 @@ private:
 
 public:
 	~RuntimeNodeSelect();
+};
+
+class RuntimeRulerTool : public RuntimeTool {
+	GDCLASS(RuntimeRulerTool, RuntimeTool);
+
+private:
+	friend class SceneDebugger;
+
+	RuntimeRulerTool();
+	~RuntimeRulerTool();
+
+	void _setup(const Dictionary &p_settings) override;
+	void _window_input_event(const Ref<InputEvent> &p_event) override;
+	void _process_frame() override;
+	void _physics_frame() override;
+
 };
 
 #endif // DEBUG_ENABLED

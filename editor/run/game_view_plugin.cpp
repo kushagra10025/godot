@@ -134,6 +134,17 @@ void GameViewDebugger::next_frame() {
 	}
 }
 
+void GameViewDebugger::set_runtime_active_tool(StringName p_active_tool) {
+	Array message;
+	message.append(p_active_tool);
+
+	for (Ref<EditorDebuggerSession> &I : sessions) {
+		if (I->is_active()) {
+			I->send_message("scene:runtime_tool_active_tool_select", message);
+		}
+	}
+}
+
 void GameViewDebugger::set_node_type(int p_type) {
 	node_type = p_type;
 
@@ -555,9 +566,15 @@ void GameView::_select_mode_pressed(int p_option) {
 		select_mode_button[i]->set_pressed_no_signal(i == mode);
 	}
 
+	debugger->set_runtime_active_tool(RuntimeNodeSelect::get_class_static());
 	debugger->set_select_mode(mode);
 
 	EditorSettings::get_singleton()->set_project_metadata("game_view", "select_mode", mode);
+}
+
+void GameView::_runtime_ruler_pressed() {
+	WARN_PRINT("Runtime Ruler Tool is Pressed!");
+	debugger->set_runtime_active_tool(RuntimeRulerTool::get_class_static());
 }
 
 void GameView::_embed_options_menu_menu_id_pressed(int p_id) {
@@ -785,6 +802,8 @@ void GameView::_notification(int p_what) {
 
 			select_mode_button[RuntimeNodeSelect::SELECT_MODE_SINGLE]->set_button_icon(get_editor_theme_icon(SNAME("ToolSelect")));
 			select_mode_button[RuntimeNodeSelect::SELECT_MODE_LIST]->set_button_icon(get_editor_theme_icon(SNAME("ListSelect")));
+
+			runtime_ruler_button->set_button_icon(get_editor_theme_icon(SNAME("Ruler")));
 
 			hide_selection->set_button_icon(get_editor_theme_icon(hide_selection->is_pressed() ? SNAME("GuiVisibilityHidden") : SNAME("GuiVisibilityVisible")));
 			fixed_size_button->set_button_icon(get_editor_theme_icon(SNAME("FixedSize")));
@@ -1111,7 +1130,10 @@ GameView::GameView(Ref<GameViewDebugger> p_debugger, EmbeddedProcessBase *p_embe
 
 	main_menu_hbox->add_child(memnew(VSeparator));
 
+	runtime_tool_group = memnew(ButtonGroup);
+
 	select_mode_button[RuntimeNodeSelect::SELECT_MODE_SINGLE] = memnew(Button);
+	select_mode_button[RuntimeNodeSelect::SELECT_MODE_SINGLE]->set_button_group(runtime_tool_group);
 	main_menu_hbox->add_child(select_mode_button[RuntimeNodeSelect::SELECT_MODE_SINGLE]);
 	select_mode_button[RuntimeNodeSelect::SELECT_MODE_SINGLE]->set_toggle_mode(true);
 	select_mode_button[RuntimeNodeSelect::SELECT_MODE_SINGLE]->set_pressed(true);
@@ -1121,6 +1143,7 @@ GameView::GameView(Ref<GameViewDebugger> p_debugger, EmbeddedProcessBase *p_embe
 	select_mode_button[RuntimeNodeSelect::SELECT_MODE_SINGLE]->set_shortcut_context(this);
 
 	select_mode_button[RuntimeNodeSelect::SELECT_MODE_LIST] = memnew(Button);
+	select_mode_button[RuntimeNodeSelect::SELECT_MODE_LIST]->set_button_group(runtime_tool_group);
 	main_menu_hbox->add_child(select_mode_button[RuntimeNodeSelect::SELECT_MODE_LIST]);
 	select_mode_button[RuntimeNodeSelect::SELECT_MODE_LIST]->set_toggle_mode(true);
 	select_mode_button[RuntimeNodeSelect::SELECT_MODE_LIST]->set_theme_type_variation(SceneStringName(FlatButton));
@@ -1128,6 +1151,14 @@ GameView::GameView(Ref<GameViewDebugger> p_debugger, EmbeddedProcessBase *p_embe
 	select_mode_button[RuntimeNodeSelect::SELECT_MODE_LIST]->set_tooltip_text(TTRC("Show list of selectable nodes at position clicked."));
 
 	_select_mode_pressed(EditorSettings::get_singleton()->get_project_metadata("game_view", "select_mode", 0));
+
+	runtime_ruler_button = memnew(Button);
+	runtime_ruler_button->set_button_group(runtime_tool_group);
+	main_menu_hbox->add_child(runtime_ruler_button);
+	runtime_ruler_button->set_toggle_mode(true);
+	runtime_ruler_button->set_theme_type_variation(SceneStringName(FlatButton));
+	runtime_ruler_button->connect(SceneStringName(pressed), callable_mp(this, &GameView::_runtime_ruler_pressed));
+	runtime_ruler_button->set_tooltip_text(TTRC("Toggle Ruler"));
 
 	main_menu_hbox->add_child(memnew(VSeparator));
 

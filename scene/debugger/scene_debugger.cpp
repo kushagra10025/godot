@@ -71,6 +71,7 @@ SceneDebugger::SceneDebugger() {
 	LiveEditor::singleton = memnew(LiveEditor);
 	RuntimeToolManager::singleton = memnew(RuntimeToolManager);
 	RuntimeToolManager::get_singleton()->register_tool(memnew(RuntimeNodeSelect));
+	RuntimeToolManager::get_singleton()->register_tool(memnew(RuntimeRulerTool));
 
 	RuntimeToolManager::get_singleton()->set_active_tool(RuntimeNodeSelect::get_class_static());
 
@@ -385,6 +386,13 @@ Error SceneDebugger::_msg_live_reparent_node(const Array &p_args) {
 	return OK;
 }
 
+Error SceneDebugger::_msg_runtime_tool_active_tool_select(const Array &p_args) {
+	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
+	StringName active_tool_name = (StringName)p_args[0];
+	RuntimeToolManager::get_singleton()->set_active_tool(active_tool_name);
+	return OK;
+}
+
 // endregion
 
 // region Runtime Node Selection.
@@ -532,6 +540,7 @@ void SceneDebugger::_init_message_handlers() {
 	message_handlers["live_restore_node"] = _msg_live_restore_node;
 	message_handlers["live_duplicate_node"] = _msg_live_duplicate_node;
 	message_handlers["live_reparent_node"] = _msg_live_reparent_node;
+	message_handlers["runtime_tool_active_tool_select"] = _msg_runtime_tool_active_tool_select;
 	message_handlers["runtime_node_select_setup"] = _msg_runtime_node_select_setup;
 	message_handlers["runtime_node_select_set_type"] = _msg_runtime_node_select_set_type;
 	message_handlers["runtime_node_select_set_mode"] = _msg_runtime_node_select_set_mode;
@@ -3085,5 +3094,30 @@ void RuntimeNodeSelect::_find_3d_items_at_rect(const Rect2 &p_rect, Vector<Selec
 	}
 }
 #endif // _3D_DISABLED
+
+/// RuntimeRulerTool
+RuntimeRulerTool::RuntimeRulerTool() {
+
+}
+
+RuntimeRulerTool::~RuntimeRulerTool() {
+
+}
+
+void RuntimeRulerTool::_setup(const Dictionary &p_settings) {
+
+}
+
+void RuntimeRulerTool::_window_input_event(const Ref<InputEvent> &p_event) {
+
+}
+
+void RuntimeRulerTool::_process_frame() {
+	WARN_PRINT_ONCE("Active Tool is Runtime Ruler Tool");
+}
+
+void RuntimeRulerTool::_physics_frame() {
+
+}
 
 #endif // DEBUG_ENABLED

@@ -37,6 +37,7 @@
 #include "scene/debugger/scene_debugger.h"
 #include "scene/gui/box_container.h"
 
+class ButtonGroup;
 class EmbeddedProcessBase;
 class VSeparator;
 class WindowWrapper;
@@ -82,6 +83,7 @@ public:
 	void set_suspend(bool p_enabled);
 	void next_frame();
 
+	void set_runtime_active_tool(StringName p_active_tool);
 	void set_node_type(int p_type);
 	void set_select_mode(int p_mode);
 
@@ -153,7 +155,10 @@ class GameView : public VBoxContainer {
 	Button *next_frame_button = nullptr;
 
 	Button *node_type_button[RuntimeToolManager::NodeType::NODE_TYPE_MAX];
+
+	ButtonGroup *runtime_tool_group = nullptr;
 	Button *select_mode_button[RuntimeNodeSelect::SELECT_MODE_MAX];
+	Button *runtime_ruler_button = nullptr;
 
 	Button *hide_selection = nullptr;
 
@@ -182,6 +187,7 @@ class GameView : public VBoxContainer {
 
 	void _node_type_pressed(int p_option);
 	void _select_mode_pressed(int p_option);
+	void _runtime_ruler_pressed();
 	void _embed_options_menu_menu_id_pressed(int p_id);
 	void _size_mode_button_pressed(int size_mode);
 
@@ -257,7 +263,7 @@ protected:
 	void _notification(int p_what);
 #ifndef ANDROID_ENABLED
 	void setup(Ref<GameViewDebugger> p_debugger, EmbeddedProcessBase *p_embedded_process);
-#endif
+#endif // ANDROID_ENABLED
 
 public:
 	virtual String get_plugin_name() const override { return TTRC("Game"); }
