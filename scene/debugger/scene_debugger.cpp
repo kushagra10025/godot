@@ -3254,6 +3254,7 @@ void RuntimeRulerTool::_physics_frame() {
 	}
 }
 
+#ifndef _3D_DISABLED
 Vector3 RuntimeRulerTool::_get_instance_position(const Vector2 &p_pos, Node3D *p_node) const {
 	Window *root = SceneTree::get_singleton()->get_root();
 
@@ -3378,6 +3379,7 @@ AABB RuntimeRulerTool::_calculate_spatial_bounds(const Node3D *p_parent, bool p_
 
 	return bounds;
 }
+#endif // _3D_DISABLED
 
 Vector2 RuntimeRulerTool::_get_warped_mouse_motion(const Ref<InputEventMouseMotion> &p_ev_mouse_motion) const {
 	Vector2 relative;

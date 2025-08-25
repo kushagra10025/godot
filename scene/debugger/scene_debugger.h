@@ -553,8 +553,11 @@ private:
 	void _process_frame() override;
 	void _physics_frame() override;
 
+#ifndef _3D_DISABLED
 	Vector3 _get_instance_position(const Vector2 &p_pos, Node3D *p_node) const;
 	static AABB _calculate_spatial_bounds(const Node3D *p_parent, bool p_omit_top_level, const Transform3D *p_bounds_orientation);
+#endif // _3D_DISABLED
+
 	Point2 _get_warped_mouse_motion(const Ref<InputEventMouseMotion> &p_ev_mouse_motion) const;
 };
 
