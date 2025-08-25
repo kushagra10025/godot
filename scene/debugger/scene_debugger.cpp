@@ -3162,6 +3162,23 @@ void RuntimeRulerTool::_setup(const Dictionary &p_settings) {
 }
 
 void RuntimeRulerTool::_window_input_event(const Ref<InputEvent> &p_event) {
+	Window *root = SceneTree::get_singleton()->get_root();
+	RuntimeToolManager::NodeType active_node_type = RuntimeToolManager::get_singleton()->get_active_node_type();
+
+	if (active_node_type == RuntimeToolManager::NodeType::NODE_TYPE_NONE) {
+		return;
+	}
+
+	if (RuntimeToolManager::get_singleton()->get_view_context()->get_camera_override()) {
+		if (active_node_type == RuntimeToolManager::NodeType::NODE_TYPE_2D) {
+			RuntimeToolManager::get_singleton()->get_view_context()->panner->gui_input(p_event, Rect2(Vector2(), root->get_visible_rect().get_size()));
+#ifndef _3D_DISABLED
+		} else if (active_node_type == RuntimeToolManager::NodeType::NODE_TYPE_3D) {
+			RuntimeToolManager::get_singleton()->get_view_context()->handle_3d_input(p_event);
+#endif // _3D_DISABLED
+		}
+	}
+
 	Ref<InputEventMouseButton> b = p_event;
 	if (b.is_valid()) {
 		mouse_pos = b->get_position();
@@ -3365,7 +3382,8 @@ AABB RuntimeRulerTool::_calculate_spatial_bounds(const Node3D *p_parent, bool p_
 Vector2 RuntimeRulerTool::_get_warped_mouse_motion(const Ref<InputEventMouseMotion> &p_ev_mouse_motion) const {
 	Vector2 relative;
 	if (_warped_mouse_panning_3d) {
-		relative = Input::get_singleton()->warp_mouse_motion(p_ev_mouse_motion, SceneTree::get_singleton()->get_root()->get_viewport()->get_visible_rect());
+		relative = Input::get_singleton()->warp_mouse_motion(p_ev_mouse_motion, Rect2(Vector2(), SceneTree::get_singleton()->get_root()->get_visible_rect().get_size()));
+		// relative = Input::get_singleton()->warp_mouse_motion(p_ev_mouse_motion, SceneTree::get_singleton()->get_root()->get_viewport()->get_visible_rect());
 	} else {
 		relative = p_ev_mouse_motion->get_relative();
 	}
