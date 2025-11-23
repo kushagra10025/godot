@@ -3159,6 +3159,8 @@ RuntimeRulerTool::~RuntimeRulerTool() {
 
 void RuntimeRulerTool::_setup(const Dictionary &p_settings) {
 	_warped_mouse_panning_3d = p_settings.get("editors/3d/navigation/warped_mouse_panning", true);
+
+	SceneTree::get_singleton()->get_root()->get_viewport()->connect(SceneStringName(gui_input), callable_mp(this, &RuntimeRulerTool::_gui_input_viewport));
 }
 
 void RuntimeRulerTool::_window_input_event(const Ref<InputEvent> &p_event) {
@@ -3252,6 +3254,15 @@ void RuntimeRulerTool::_physics_frame() {
 			ruler_label->set_visible(true);
 		}
 	}
+}
+
+void RuntimeRulerTool::_gui_input_viewport(const Ref<InputEvent> &p_event) {
+	if (RuntimeToolManager::get_singleton()->get_active_node_type() != RuntimeToolManager::NodeType::NODE_TYPE_2D) {
+		return;
+	}
+	Ref<InputEventMouseButton> b = p_event;
+	Ref<InputEventMouseMotion> m = p_event;
+
 }
 
 #ifndef _3D_DISABLED
